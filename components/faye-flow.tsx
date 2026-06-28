@@ -63,6 +63,32 @@ const navItems: Array<{ href: string; label: string; view: FayeView }> = [
   { href: "/demo", label: "Demo", view: "demo" },
 ]
 
+const workspaceCopy: Record<
+  FayeView,
+  { title: string; description: string; badge: string }
+> = {
+  scan: {
+    title: "FAYE",
+    description: "Escanea, clasifica y registra.",
+    badge: "Captura",
+  },
+  result: {
+    title: "FAYE",
+    description: "Decision lista para actuar.",
+    badge: "Resultado",
+  },
+  habit: {
+    title: "FAYE",
+    description: "Habito e impacto.",
+    badge: "Progreso",
+  },
+  demo: {
+    title: "FAYE demo",
+    description: "Escanear -> clasificar -> registrar.",
+    badge: "Jurado",
+  },
+}
+
 export function FayeFlow({
   view,
   initialResidueId,
@@ -157,99 +183,108 @@ export function FayeFlow({
 
   return (
     <TooltipProvider>
-      <main className="min-h-dvh bg-background text-foreground">
-        <div className="flex min-h-dvh w-full flex-col px-3 py-3 sm:px-4 lg:px-5">
-          <AppHeader activeView={view} />
+      <main className="h-dvh overflow-hidden bg-background text-foreground">
+        <div className="grid h-dvh w-full grid-rows-[auto_minmax(0,1fr)] items-stretch gap-2 overflow-hidden p-2 lg:grid-cols-[204px_minmax(0,1fr)] lg:grid-rows-1 lg:gap-3 lg:p-4">
+          <AppHeader
+            activeView={view}
+            selectedResidue={selectedResidue}
+            points={points}
+            progress={progress}
+          />
 
-          <section
-            className={cn(
-              "grid flex-1 gap-4 py-4",
-              view === "demo"
-                ? "lg:grid-cols-[280px_minmax(0,1fr)_340px]"
-                : "lg:grid-cols-[minmax(0,1fr)_340px]"
-            )}
-          >
-            {view === "scan" && (
-              <>
-                <ScanPanel
-                  selectedResidue={selectedResidue}
-                  selectedId={selectedId}
-                  uploadPreview={uploadPreview}
-                  phase={phase}
-                  onAnalyze={analyzeResidue}
-                  onSelectResidue={selectResidue}
-                  onUpload={handleUpload}
-                />
-                <FlowAside />
-              </>
-            )}
+          <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card/30 shadow-sm lg:h-[calc(100dvh-2rem)]">
+            <WorkspaceHeader view={view} selectedResidue={selectedResidue} />
 
-            {view === "result" && (
-              <>
-                <ResultPanel
-                  selectedResidue={selectedResidue}
-                  phase={phase}
-                  source={source}
-                  onAnalyze={analyzeResidue}
-                  onRecord={recordAction}
-                />
-                <HabitPanel
-                  selectedResidue={selectedResidue}
-                  phase={phase}
-                  loggedCount={loggedCount}
-                  points={points}
-                  progress={progress}
-                  streak={streak}
-                  compact
-                />
-              </>
-            )}
+            <div
+              className={cn(
+                "grid min-h-0 flex-1 gap-3 overflow-hidden p-3",
+                view === "demo"
+                  ? "xl:grid-cols-[260px_minmax(0,1fr)_320px]"
+                  : "xl:grid-cols-[minmax(0,1fr)_320px]"
+              )}
+            >
+              {view === "scan" && (
+                <>
+                  <ScanPanel
+                    selectedResidue={selectedResidue}
+                    selectedId={selectedId}
+                    uploadPreview={uploadPreview}
+                    phase={phase}
+                    onAnalyze={analyzeResidue}
+                    onSelectResidue={selectResidue}
+                    onUpload={handleUpload}
+                  />
+                  <FlowAside />
+                </>
+              )}
 
-            {view === "habit" && (
-              <>
-                <HabitPanel
-                  selectedResidue={selectedResidue}
-                  phase="logged"
-                  loggedCount={loggedCount}
-                  points={points}
-                  progress={progress}
-                  streak={streak}
-                />
-                <ResultSummary selectedResidue={selectedResidue} />
-              </>
-            )}
+              {view === "result" && (
+                <>
+                  <ResultPanel
+                    selectedResidue={selectedResidue}
+                    phase={phase}
+                    source={source}
+                    onAnalyze={analyzeResidue}
+                    onRecord={recordAction}
+                  />
+                  <HabitPanel
+                    selectedResidue={selectedResidue}
+                    phase={phase}
+                    loggedCount={loggedCount}
+                    points={points}
+                    progress={progress}
+                    streak={streak}
+                    compact
+                  />
+                </>
+              )}
 
-            {view === "demo" && (
-              <>
-                <ScanPanel
-                  selectedResidue={selectedResidue}
-                  selectedId={selectedId}
-                  uploadPreview={uploadPreview}
-                  phase={phase}
-                  onAnalyze={analyzeResidue}
-                  onSelectResidue={selectResidue}
-                  onUpload={handleUpload}
-                  compact
-                />
-                <ResultPanel
-                  selectedResidue={selectedResidue}
-                  phase={phase}
-                  source={uploadPreview ? "upload" : null}
-                  onAnalyze={analyzeResidue}
-                  onRecord={recordAction}
-                  compact
-                />
-                <HabitPanel
-                  selectedResidue={selectedResidue}
-                  phase={phase}
-                  loggedCount={loggedCount}
-                  points={points}
-                  progress={progress}
-                  streak={streak}
-                  compact
-                />
-              </>
-            )}
+              {view === "habit" && (
+                <>
+                  <HabitPanel
+                    selectedResidue={selectedResidue}
+                    phase="logged"
+                    loggedCount={loggedCount}
+                    points={points}
+                    progress={progress}
+                    streak={streak}
+                  />
+                  <ResultSummary selectedResidue={selectedResidue} />
+                </>
+              )}
+
+              {view === "demo" && (
+                <>
+                  <ScanPanel
+                    selectedResidue={selectedResidue}
+                    selectedId={selectedId}
+                    uploadPreview={uploadPreview}
+                    phase={phase}
+                    onAnalyze={analyzeResidue}
+                    onSelectResidue={selectResidue}
+                    onUpload={handleUpload}
+                    compact
+                  />
+                  <ResultPanel
+                    selectedResidue={selectedResidue}
+                    phase={phase}
+                    source={uploadPreview ? "upload" : null}
+                    onAnalyze={analyzeResidue}
+                    onRecord={recordAction}
+                    compact
+                  />
+                  <HabitPanel
+                    selectedResidue={selectedResidue}
+                    phase={phase}
+                    loggedCount={loggedCount}
+                    points={points}
+                    progress={progress}
+                    streak={streak}
+                    compact
+                  />
+                </>
+              )}
+            </div>
           </section>
         </div>
       </main>
@@ -257,40 +292,100 @@ export function FayeFlow({
   )
 }
 
-function AppHeader({ activeView }: { activeView: FayeView }) {
+function AppHeader({
+  activeView,
+  selectedResidue,
+  points,
+  progress,
+}: {
+  activeView: FayeView
+  selectedResidue: DemoResidue
+  points: number
+  progress: number
+}) {
   return (
-    <header className="flex flex-col gap-4 border-b border-border/70 pb-4 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="flex size-9 items-center justify-center rounded-md border border-border bg-card">
-          <span className="sr-only">FAYE</span>
-          <FayeLogo className="size-5" />
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium">FAYE</p>
-            <Badge variant="outline">Beta privada</Badge>
+    <aside className="flex min-h-0 flex-col gap-2 rounded-lg border border-border bg-card/40 p-2 lg:h-[calc(100dvh-2rem)] lg:gap-3 lg:p-3">
+      <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-background/60 px-2 py-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="flex size-7 items-center justify-center rounded-md border border-border bg-muted/30">
+            <FayeLogo className="size-4" />
           </div>
-          <p className="text-xs text-muted-foreground">
-            Clasifica residuos, registra habitos y muestra impacto.
-          </p>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold">FAYE</p>
+            <p className="truncate text-[0.625rem] text-muted-foreground">
+              Clasifica residuos
+            </p>
+          </div>
         </div>
+        <Badge variant="outline">Beta</Badge>
       </div>
 
-      <nav className="flex flex-wrap items-center gap-2" aria-label="FAYE">
+      <nav
+        className="grid gap-1 sm:grid-cols-4 lg:grid-cols-1"
+        aria-label="FAYE workspace"
+      >
         {navItems.map((item) => (
           <Link
             key={item.href}
             href={item.href}
             className={cn(
-              "inline-flex h-7 items-center rounded-md border border-border px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-              activeView === item.view && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+              "flex h-8 items-center justify-between rounded-md border border-transparent px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+              activeView === item.view &&
+                "border-border bg-muted text-foreground"
             )}
           >
-            {item.label}
+            <span>{item.label}</span>
+            {activeView === item.view ? (
+              <span className="size-1.5 rounded-full bg-foreground" />
+            ) : null}
           </Link>
         ))}
       </nav>
-    </header>
+
+      <Separator className="hidden lg:block" />
+
+      <div className="hidden flex-col gap-3 lg:flex">
+        <SidebarMetric label="Residuo" value={selectedResidue.shortName} />
+        <SidebarMetric label="Progreso" value={`${progress}%`} />
+        <SidebarMetric label="Puntos" value={`${points}`} />
+      </div>
+
+    </aside>
+  )
+}
+
+function WorkspaceHeader({
+  view,
+  selectedResidue,
+}: {
+  view: FayeView
+  selectedResidue: DemoResidue
+}) {
+  const copy = workspaceCopy[view]
+
+  return (
+    <div className="flex min-h-11 items-center justify-between gap-3 border-b border-border px-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-semibold">{copy.title}</p>
+          <Badge variant="secondary">{copy.badge}</Badge>
+        </div>
+        <p className="truncate text-xs text-muted-foreground">{copy.description}</p>
+      </div>
+      <div className="hidden items-center gap-2 sm:flex">
+        <Badge variant="outline">{selectedResidue.material}</Badge>
+        <Badge variant="outline">{selectedResidue.confidence}%</Badge>
+      </div>
+    </div>
+  )
+}
+
+function SidebarMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-border bg-background/60 p-2">
+      <p className="text-[0.625rem] text-muted-foreground">{label}</p>
+      <p className="mt-1 truncate text-xs font-medium">{value}</p>
+    </div>
   )
 }
 
@@ -304,10 +399,10 @@ function PanelHeader({
   action?: React.ReactNode
 }) {
   return (
-    <div className="flex items-start justify-between gap-4">
+    <div className="flex items-center justify-between gap-3">
       <div className="min-w-0">
-        <h2 className="text-sm font-semibold text-balance">{title}</h2>
-        <p className="mt-1 text-xs text-pretty text-muted-foreground">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">
           {description}
         </p>
       </div>
@@ -336,10 +431,10 @@ function ScanPanel({
   compact?: boolean
 }) {
   return (
-    <section className={cn("flex flex-col gap-4", !compact && "min-h-[620px]")}>
+    <section className="flex h-full min-h-0 flex-col gap-3">
       <PanelHeader
         title="Entrada"
-        description="Toma una foto, sube una imagen o usa un residuo demo."
+        description="Foto, archivo o demo."
         action={
           <Tooltip>
             <TooltipTrigger
@@ -349,33 +444,46 @@ function ScanPanel({
                 </Button>
               }
             />
-            <TooltipContent>La foto se procesa localmente en esta fase.</TooltipContent>
+            <TooltipContent>Entrada visual del residuo.</TooltipContent>
           </Tooltip>
         }
       />
-      <div className={cn("grid gap-4", !compact && "lg:grid-cols-[1fr_280px]")}>
-        <div className="flex min-h-96 flex-col justify-between rounded-md border border-border bg-muted/20 p-3">
+      <div
+        className={cn(
+          "grid min-h-0 flex-1 gap-3",
+          !compact && "lg:grid-cols-[1fr_280px]"
+        )}
+      >
+        <div className="flex min-h-0 flex-col justify-between rounded-md border border-border bg-muted/20 p-3">
           <div className="flex items-center justify-between gap-2">
             <Badge variant="outline">{uploadPreview ? "Imagen subida" : "Vista demo"}</Badge>
             <Badge variant="secondary">{selectedResidue.material}</Badge>
           </div>
 
-          <div className="flex flex-1 items-center justify-center py-8">
+          <div className="flex min-h-0 flex-1 items-center justify-center py-4">
             {uploadPreview ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={uploadPreview.url}
                 alt={`Residuo subido: ${uploadPreview.name}`}
-                className="max-h-72 w-full max-w-md rounded-md border border-border object-contain"
+                className={cn(
+                  "w-full rounded-md border border-border object-contain",
+                  compact ? "max-h-40" : "max-h-64 max-w-md"
+                )}
               />
             ) : (
-              <div className="grid size-48 place-items-center rounded-md border border-border bg-card">
-                <div className="flex flex-col items-center gap-3 text-center">
-                  <div className="grid size-14 place-items-center rounded-md bg-muted">
-                    <HugeiconsIcon icon={scenarioIcons[selectedResidue.id]} size={28} />
+              <div
+                className={cn(
+                  "grid place-items-center rounded-md border border-border bg-card",
+                  compact ? "size-36" : "size-48"
+                )}
+              >
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <div className="grid size-12 place-items-center rounded-md bg-muted">
+                    <HugeiconsIcon icon={scenarioIcons[selectedResidue.id]} size={24} />
                   </div>
                   <div>
-                    <p className="text-3xl font-semibold">{selectedResidue.visual.label}</p>
+                    <p className="text-2xl font-semibold">{selectedResidue.visual.label}</p>
                     <p className="text-xs text-muted-foreground">
                       {selectedResidue.visual.detail}
                     </p>
@@ -389,29 +497,29 @@ function ScanPanel({
             <span className="truncate">
               {uploadPreview ? uploadPreview.name : selectedResidue.shortName}
             </span>
-            <span>{uploadPreview ? uploadPreview.sizeLabel : `${selectedResidue.confidence}% match`}</span>
+            <span className="shrink-0">{uploadPreview ? uploadPreview.sizeLabel : `${selectedResidue.confidence}%`}</span>
           </div>
         </div>
 
-        <div className="flex flex-col gap-4">
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="residue-photo">Imagen del residuo</FieldLabel>
-              <Input
-                id="residue-photo"
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={onUpload}
-              />
-              <FieldDescription>
-                En esta etapa FAYE muestra preview local; el analisis real se enchufa luego al gateway.
-              </FieldDescription>
-            </Field>
-          </FieldGroup>
+        <div className="flex min-h-0 flex-col gap-3">
+          {!compact ? (
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="residue-photo">Imagen del residuo</FieldLabel>
+                <Input
+                  id="residue-photo"
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={onUpload}
+                />
+                <FieldDescription>Preview local para la demo.</FieldDescription>
+              </Field>
+            </FieldGroup>
+          ) : null}
 
-          <div className="flex flex-col gap-2">
-            <p className="text-xs font-medium">Escenario demo seguro</p>
+          <div className={cn("flex flex-col gap-2", compact && "hidden")}>
+            <p className="text-xs font-medium">Residuo demo</p>
             <ToggleGroup
               multiple={false}
               value={[selectedId]}
@@ -449,14 +557,14 @@ function ScanPanel({
           </div>
 
           <Button
-            size="lg"
+            size={compact ? "default" : "lg"}
             onClick={onAnalyze}
             disabled={phase === "analyzing"}
             data-testid="analyze-residue"
-            className="w-full"
+            className="mt-auto w-full"
           >
             <HugeiconsIcon icon={AiScanIcon} data-icon="inline-start" />
-            {phase === "analyzing" ? "Analizando" : "Analizar residuo"}
+            {phase === "analyzing" ? "Analizando" : "Analizar"}
           </Button>
         </div>
       </div>
@@ -480,18 +588,18 @@ function ResultPanel({
   compact?: boolean
 }) {
   return (
-    <section className={cn("flex flex-col gap-4", !compact && "min-h-[620px]")}>
+    <section className="flex h-full min-h-0 flex-col gap-3">
       <PanelHeader
         title="Clasificacion"
-        description="FAYE transforma la incertidumbre en una accion concreta."
+        description="Destino y accion."
         action={
           <Badge variant={phase === "analyzing" ? "secondary" : "default"}>
             {phase === "analyzing" ? "Analizando" : source === "upload" ? "Imagen" : "Demo"}
           </Badge>
         }
       />
-      <div className="flex h-full flex-col gap-4">
-        <div className="flex min-h-32 flex-col justify-between rounded-md border border-border bg-muted/20 p-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+        <div className="flex min-h-0 flex-col justify-between rounded-md border border-border bg-muted/20 p-3">
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 gap-3">
               <div className="grid size-9 shrink-0 place-items-center rounded-md bg-card">
@@ -503,12 +611,12 @@ function ResultPanel({
               <div className="min-w-0">
                 <p className="text-sm font-medium">
                   {phase === "analyzing"
-                    ? "FAYE esta revisando forma, material y contexto."
+                    ? "Analizando residuo"
                     : `Resultado probable: ${selectedResidue.name}`}
                 </p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
                   {phase === "analyzing"
-                    ? "El motor interno compara senales visuales y usa fallback demo si algo falla."
+                    ? "FAYE compara senales visuales y prepara una accion."
                     : selectedResidue.rationale}
                 </p>
               </div>
@@ -522,7 +630,7 @@ function ResultPanel({
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-2 md:grid-cols-3">
           <DecisionMetric
             label="Categoria"
             value={selectedResidue.category}
@@ -536,21 +644,21 @@ function ResultPanel({
           />
         </div>
 
-        <Separator />
+        {!compact ? <Separator /> : null}
 
-        <div className="grid gap-4 md:grid-cols-[1fr_220px]">
+        <div className="grid min-h-0 gap-3 md:grid-cols-[1fr_210px]">
           <div className="flex flex-col gap-2">
             <p className="text-xs font-medium">Accion recomendada</p>
-            <p className="text-sm leading-6 text-muted-foreground">
+            <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">
               {selectedResidue.preparation}
             </p>
           </div>
           <div className="flex flex-col gap-2 rounded-md border border-border bg-card p-3">
             <div className="flex items-center gap-2">
               <HugeiconsIcon icon={Leaf01Icon} size={16} />
-              <p className="text-xs font-medium">Impacto inmediato</p>
+            <p className="text-xs font-medium">Impacto inmediato</p>
             </div>
-            <p className="text-xs leading-5 text-muted-foreground">
+            <p className="line-clamp-3 text-xs leading-5 text-muted-foreground">
               {selectedResidue.impact}
             </p>
           </div>
@@ -558,7 +666,7 @@ function ResultPanel({
 
         <div className="mt-auto flex flex-col gap-2 sm:flex-row">
           <Button
-            size="lg"
+            size={compact ? "default" : "lg"}
             variant="outline"
             onClick={onAnalyze}
             disabled={phase === "analyzing"}
@@ -568,14 +676,14 @@ function ResultPanel({
             Reanalizar
           </Button>
           <Button
-            size="lg"
+            size={compact ? "default" : "lg"}
             onClick={onRecord}
             disabled={phase === "analyzing"}
             data-testid="record-action"
             className="flex-1"
           >
             <HugeiconsIcon icon={CheckmarkCircle02Icon} data-icon="inline-start" />
-            Registrar accion
+            Registrar
           </Button>
         </div>
       </div>
@@ -603,20 +711,20 @@ function HabitPanel({
   const isLogged = phase === "logged"
 
   return (
-    <section className={cn("flex flex-col gap-4", !compact && "min-h-[620px]")}>
+    <section className="flex h-full min-h-0 flex-col gap-3">
       <PanelHeader
         title="Habito"
-        description="Progreso visible para repetir la accion."
+        description="Progreso visible."
         action={<Badge variant="outline">{points} pts</Badge>}
       />
-      <div className="flex flex-col gap-4">
-        <Tabs defaultValue="today">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+        <Tabs defaultValue="today" className="min-h-0">
           <TabsList className="w-full">
             <TabsTrigger value="today">Hoy</TabsTrigger>
             <TabsTrigger value="impact">Impacto</TabsTrigger>
             <TabsTrigger value="flow">Flujo</TabsTrigger>
           </TabsList>
-          <TabsContent value="today" className="flex flex-col gap-4 pt-2">
+          <TabsContent value="today" className="flex min-h-0 flex-col gap-3 overflow-hidden pt-1">
             <Progress value={progress}>
               <ProgressLabel>Meta semanal</ProgressLabel>
               <ProgressValue />
@@ -627,24 +735,24 @@ function HabitPanel({
             </div>
             <div className="rounded-md border border-border bg-muted/20 p-3">
               <p className="text-xs font-medium">Registro de FAYE</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground">
                 {isLogged
                   ? selectedResidue.habit
-                  : "Cuando registres la accion, FAYE la suma a tu habito y ajusta el progreso."}
+                  : "Registra la accion para sumar progreso."}
               </p>
             </div>
           </TabsContent>
-          <TabsContent value="impact" className="flex flex-col gap-3 pt-2">
+          <TabsContent value="impact" className="flex min-h-0 flex-col gap-2 overflow-hidden pt-1">
             <ImpactRow label="Residuos recuperados" value={isLogged ? "9" : "8"} />
             <ImpactRow label="CO2e estimado" value={isLogged ? "146 g" : "128 g"} />
             <ImpactRow label="Errores evitados" value="3" />
-            <div className="rounded-md border border-border bg-muted/20 p-3">
+            <div className={cn("rounded-md border border-border bg-muted/20 p-3", compact && "hidden")}>
               <p className="text-xs leading-5 text-muted-foreground">
                 Cada clasificacion correcta alimenta recomendaciones mas precisas para el hogar.
               </p>
             </div>
           </TabsContent>
-          <TabsContent value="flow" className="flex flex-col gap-3 pt-2">
+          <TabsContent value="flow" className="flex min-h-0 flex-col gap-2 overflow-hidden pt-1">
             <FlowStep index="01" title="Descubrir" description="Foto o residuo seleccionado." />
             <FlowStep index="02" title="Entender" description="FAYE identifica y explica." />
             <FlowStep index="03" title="Actuar" description="El usuario sigue el paso." />
@@ -652,19 +760,21 @@ function HabitPanel({
           </TabsContent>
         </Tabs>
 
-        <Separator />
+        {!compact ? <Separator /> : null}
 
-        <div className="flex items-start gap-3 rounded-md border border-border bg-card p-3">
-          <div className="grid size-8 shrink-0 place-items-center rounded-md bg-muted">
-            <HugeiconsIcon icon={ChartUpIcon} size={18} />
+        {!compact ? (
+          <div className="flex items-start gap-3 rounded-md border border-border bg-card p-3">
+            <div className="grid size-8 shrink-0 place-items-center rounded-md bg-muted">
+              <HugeiconsIcon icon={ChartUpIcon} size={18} />
+            </div>
+            <div>
+              <p className="text-xs font-medium">Ciclo completo</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                Duda resuelta, accion registrada e impacto visible.
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-medium">Ciclo completo</p>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              Duda resuelta, accion registrada e impacto visible en una sola experiencia.
-            </p>
-          </div>
-        </div>
+        ) : null}
       </div>
     </section>
   )
@@ -672,16 +782,16 @@ function HabitPanel({
 
 function FlowAside() {
   return (
-    <aside className="flex flex-col gap-4">
+    <aside className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <PanelHeader
-        title="Como funciona"
-        description="Una ruta corta, clara y demo-safe."
+        title="Flujo"
+        description="De duda a habito."
       />
-      <div className="flex flex-col gap-3">
-        <FlowStep index="01" title="Entrada" description="Imagen o residuo demo." />
-        <FlowStep index="02" title="Clasificacion" description="FAYE devuelve categoria y accion." />
-        <FlowStep index="03" title="Registro" description="La accion suma a tu habito." />
-        <FlowStep index="04" title="Impacto" description="El progreso se vuelve visible." />
+      <div className="flex min-h-0 flex-col gap-2">
+        <FlowStep index="01" title="Entrada" description="Imagen o demo." />
+        <FlowStep index="02" title="Clasificar" description="Categoria y destino." />
+        <FlowStep index="03" title="Actuar" description="Paso claro." />
+        <FlowStep index="04" title="Repetir" description="Progreso visible." />
       </div>
     </aside>
   )
@@ -689,10 +799,10 @@ function FlowAside() {
 
 function ResultSummary({ selectedResidue }: { selectedResidue: DemoResidue }) {
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <PanelHeader
-        title="Ultima clasificacion"
-        description="Resumen del residuo registrado."
+        title="Ultimo registro"
+        description="Residuo, destino y siguiente accion."
       />
       <div className="flex flex-col gap-3">
         <DecisionMetric
@@ -722,12 +832,12 @@ function DecisionMetric({
   icon: typeof Recycle01Icon
 }) {
   return (
-    <div className="flex min-h-24 flex-col justify-between rounded-md border border-border bg-muted/20 p-3">
+    <div className="flex min-h-20 flex-col justify-between rounded-md border border-border bg-muted/20 p-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">{label}</p>
         <HugeiconsIcon icon={icon} size={16} />
       </div>
-      <p className="text-sm font-medium leading-5">{value}</p>
+      <p className="line-clamp-2 text-sm font-medium leading-5">{value}</p>
     </div>
   )
 }
@@ -736,7 +846,7 @@ function StatBlock({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-border bg-muted/20 p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
     </div>
   )
 }
@@ -760,13 +870,13 @@ function FlowStep({
   description: string
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-md border border-border bg-muted/20 p-3">
-      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-card text-xs font-medium tabular-nums">
+    <div className="flex items-center gap-2 rounded-md border border-border bg-muted/20 p-2">
+      <span className="grid size-6 shrink-0 place-items-center rounded-md bg-card text-[0.625rem] font-medium tabular-nums">
         {index}
       </span>
       <div className="min-w-0">
         <p className="text-xs font-medium">{title}</p>
-        <p className="text-xs text-muted-foreground">{description}</p>
+        <p className="truncate text-xs text-muted-foreground">{description}</p>
       </div>
     </div>
   )
