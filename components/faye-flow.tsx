@@ -19,14 +19,6 @@ import { FayeLogo } from "@/components/faye-logo"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
   Field,
   FieldDescription,
   FieldGroup,
@@ -302,6 +294,28 @@ function AppHeader({ activeView }: { activeView: FayeView }) {
   )
 }
 
+function PanelHeader({
+  title,
+  description,
+  action,
+}: {
+  title: string
+  description: string
+  action?: React.ReactNode
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="min-w-0">
+        <h2 className="text-sm font-semibold text-balance">{title}</h2>
+        <p className="mt-1 text-xs text-pretty text-muted-foreground">
+          {description}
+        </p>
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
+    </div>
+  )
+}
+
 function ScanPanel({
   selectedResidue,
   selectedId,
@@ -322,13 +336,11 @@ function ScanPanel({
   compact?: boolean
 }) {
   return (
-    <Card className={cn(!compact && "min-h-[620px]")}>
-      <CardHeader>
-        <CardTitle>Entrada</CardTitle>
-        <CardDescription>
-          Toma una foto, sube una imagen o usa un residuo demo.
-        </CardDescription>
-        <CardAction>
+    <section className={cn("flex flex-col gap-4", !compact && "min-h-[620px]")}>
+      <PanelHeader
+        title="Entrada"
+        description="Toma una foto, sube una imagen o usa un residuo demo."
+        action={
           <Tooltip>
             <TooltipTrigger
               render={
@@ -339,9 +351,9 @@ function ScanPanel({
             />
             <TooltipContent>La foto se procesa localmente en esta fase.</TooltipContent>
           </Tooltip>
-        </CardAction>
-      </CardHeader>
-      <CardContent className={cn("grid gap-4", !compact && "lg:grid-cols-[1fr_280px]")}>
+        }
+      />
+      <div className={cn("grid gap-4", !compact && "lg:grid-cols-[1fr_280px]")}>
         <div className="flex min-h-96 flex-col justify-between rounded-md border border-border bg-muted/20 p-3">
           <div className="flex items-center justify-between gap-2">
             <Badge variant="outline">{uploadPreview ? "Imagen subida" : "Vista demo"}</Badge>
@@ -447,8 +459,8 @@ function ScanPanel({
             {phase === "analyzing" ? "Analizando" : "Analizar residuo"}
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }
 
@@ -468,19 +480,17 @@ function ResultPanel({
   compact?: boolean
 }) {
   return (
-    <Card className={cn(!compact && "min-h-[620px]")}>
-      <CardHeader>
-        <CardTitle>Clasificacion</CardTitle>
-        <CardDescription>
-          FAYE transforma la incertidumbre en una accion concreta.
-        </CardDescription>
-        <CardAction>
+    <section className={cn("flex flex-col gap-4", !compact && "min-h-[620px]")}>
+      <PanelHeader
+        title="Clasificacion"
+        description="FAYE transforma la incertidumbre en una accion concreta."
+        action={
           <Badge variant={phase === "analyzing" ? "secondary" : "default"}>
             {phase === "analyzing" ? "Analizando" : source === "upload" ? "Imagen" : "Demo"}
           </Badge>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="flex h-full flex-col gap-4">
+        }
+      />
+      <div className="flex h-full flex-col gap-4">
         <div className="flex min-h-32 flex-col justify-between rounded-md border border-border bg-muted/20 p-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 gap-3">
@@ -568,8 +578,8 @@ function ResultPanel({
             Registrar accion
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }
 
@@ -593,15 +603,13 @@ function HabitPanel({
   const isLogged = phase === "logged"
 
   return (
-    <Card className={cn(!compact && "min-h-[620px]")}>
-      <CardHeader>
-        <CardTitle>Habito</CardTitle>
-        <CardDescription>Progreso visible para repetir la accion.</CardDescription>
-        <CardAction>
-          <Badge variant="outline">{points} pts</Badge>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+    <section className={cn("flex flex-col gap-4", !compact && "min-h-[620px]")}>
+      <PanelHeader
+        title="Habito"
+        description="Progreso visible para repetir la accion."
+        action={<Badge variant="outline">{points} pts</Badge>}
+      />
+      <div className="flex flex-col gap-4">
         <Tabs defaultValue="today">
           <TabsList className="w-full">
             <TabsTrigger value="today">Hoy</TabsTrigger>
@@ -657,36 +665,36 @@ function HabitPanel({
             </p>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }
 
 function FlowAside() {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Como funciona</CardTitle>
-        <CardDescription>Una ruta corta, clara y demo-safe.</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+    <aside className="flex flex-col gap-4">
+      <PanelHeader
+        title="Como funciona"
+        description="Una ruta corta, clara y demo-safe."
+      />
+      <div className="flex flex-col gap-3">
         <FlowStep index="01" title="Entrada" description="Imagen o residuo demo." />
         <FlowStep index="02" title="Clasificacion" description="FAYE devuelve categoria y accion." />
         <FlowStep index="03" title="Registro" description="La accion suma a tu habito." />
         <FlowStep index="04" title="Impacto" description="El progreso se vuelve visible." />
-      </CardContent>
-    </Card>
+      </div>
+    </aside>
   )
 }
 
 function ResultSummary({ selectedResidue }: { selectedResidue: DemoResidue }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Ultima clasificacion</CardTitle>
-        <CardDescription>Resumen del residuo registrado.</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+    <section className="flex flex-col gap-4">
+      <PanelHeader
+        title="Ultima clasificacion"
+        description="Resumen del residuo registrado."
+      />
+      <div className="flex flex-col gap-3">
         <DecisionMetric
           label="Residuo"
           value={selectedResidue.name}
@@ -699,8 +707,8 @@ function ResultSummary({ selectedResidue }: { selectedResidue: DemoResidue }) {
         >
           Clasificar otro residuo
         </Link>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }
 
