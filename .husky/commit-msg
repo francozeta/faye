@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+set -e
+
+message_file="$1"
+subject="$(sed -n '1p' "$message_file")"
+
+case "$subject" in
+  Merge\ *|Revert\ *)
+    exit 0
+    ;;
+esac
+
+if ! printf '%s\n' "$subject" | grep -Eq '^(feat|fix|docs|chore|ci|build|refactor|perf|test)(\([a-z0-9-]+\))?!?: .{1,100}$'; then
+  echo "Commit message must use Conventional Commits."
+  echo "Examples:"
+  echo "  feat(web): add scan flow"
+  echo "  fix(web): keep Eve panel readable"
+  echo "  chore(ci): add verification workflow"
+  exit 1
+fi
