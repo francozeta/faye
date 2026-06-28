@@ -1,0 +1,58 @@
+area:ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
+          - .husky/**
+          - package.json
+          - pnpm-lock.yaml
+          - release-please-config.json
+          - .release-please-manifest.json
+
+area:docs:
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - README.md
+              - docs/**
+              - "**/*.md"
+      - head-branch:
+          - "^docs/"
+
+area:web:
+  - changed-files:
+      - any-glob-to-any-file:
+          - app/**
+          - components/**
+          - hooks/**
+          - lib/**
+          - public/**
+
+area:ui:
+  - changed-files:
+      - any-glob-to-any-file:
+          - app/**/page.tsx
+          - app/**/layout.tsx
+          - app/globals.css
+          - components/**
+
+area:supabase:
+  - changed-files:
+      - any-glob-to-any-file:
+          - supabase/**
+          - lib/supabase/**
+
+feature:
+  - head-branch:
+      - "^feat/"
+
+bug:
+  - head-branch:
+      - "^fix/"
+
+docs:
+  - head-branch:
+      - "^docs/"
+
+chore:
+  - head-branch:
+      - "^chore/"
