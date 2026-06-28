@@ -1,5 +1,5 @@
-import { FayeDemo } from "@/components/faye-demo"
+import { redirect } from "next/navigation"
 
 export default function Home() {
-  return <FayeDemo />
+  redirect("/scan")
 }

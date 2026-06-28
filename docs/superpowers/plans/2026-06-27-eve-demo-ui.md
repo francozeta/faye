@@ -1,8 +1,8 @@
-# Eve Demo UI Implementation Plan
+# FAYE Demo UI Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the default Next.js screen with a polished FAYE demo interface where Eve guides classification, action, and progress.
+**Goal:** Replace the default Next.js screen with a polished FAYE demo interface where FAYE guides classification, action, and progress. Eve remains the invisible internal AI layer.
 
 **Architecture:** Keep the route shell as a Server Component and isolate interactivity in one client component. Store demo residue scenarios in a typed library module so the future AI route can reuse the same response contract as fallback data.
 
@@ -75,31 +75,40 @@ Create a reusable `FayeLogo` component using the supplied cube mark with stable 
 
 Use `aria-hidden` by default and let nearby text carry the brand name.
 
-### Task 5: Eve Demo Interface
+### Task 5: FAYE Demo Interface
 
 **Files:**
+- Create: `components/faye-flow.tsx`
 - Create: `components/faye-demo.tsx`
 - Modify: `app/page.tsx`
+- Create: `app/scan/page.tsx`
+- Create: `app/result/page.tsx`
+- Create: `app/habit/page.tsx`
+- Create: `app/demo/page.tsx`
 
-- [ ] **Step 1: Build the static shell**
+- [x] **Step 1: Build the static shell**
 
-Create a three-column product workspace: input, Eve decision, and habit impact.
+Create a product workspace: input, FAYE decision, and habit impact.
 
-- [ ] **Step 2: Add scenario selection**
+- [x] **Step 2: Add scenario selection**
 
 Use `ToggleGroup` with one active seeded residue.
 
-- [ ] **Step 3: Add analysis and logging states**
+- [x] **Step 3: Add analysis and logging states**
 
 Use local React state for idle, analyzing, ready, and logged states. The analyzing state should resolve quickly and reliably.
 
-- [ ] **Step 4: Show Eve as structured intelligence**
+- [x] **Step 4: Show FAYE as structured intelligence**
 
 Render confidence, category, bin, preparation, rationale, and habit reward as a decision panel, not as a chat transcript.
 
-- [ ] **Step 5: Update progress metrics**
+- [x] **Step 5: Update progress metrics**
 
 When the action is recorded, update streak/progress/impact in the UI.
+
+- [x] **Step 6: Split demo into routes**
+
+Use `/scan`, `/result`, `/habit`, and `/demo` so the presentation can be shown as a complete product flow or as one consolidated demo board.
 
 ### Task 6: Verification
 

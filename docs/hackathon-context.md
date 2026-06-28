@@ -42,12 +42,12 @@ The solution must score across:
 
 ## Demo Implication
 
-The jury should see Eve working in the product flow:
+The jury should see FAYE using AI inside the product flow:
 
 1. A residue enters through camera, upload, or a seeded demo item.
-2. Eve identifies it with confidence and context.
-3. Eve explains the category and preparation step.
+2. FAYE identifies it with confidence and context.
+3. FAYE explains the category and preparation step.
 4. The user confirms the action.
 5. FAYE records progress and makes impact visible.
 
-This is why FAYE is not a chatbot-first app. Eve is the intelligence layer that turns uncertainty into a concrete habit action.
+This is why FAYE is not a chatbot-first app. Eve stays as the internal intelligence layer, while FAYE is the visible app that turns uncertainty into a concrete habit action.
