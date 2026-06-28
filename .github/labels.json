@@ -1,0 +1,112 @@
+[
+  {
+    "name": "bug",
+    "color": "b42318",
+    "description": "Something is not working as expected."
+  },
+  {
+    "name": "feature",
+    "color": "2563eb",
+    "description": "New product functionality or an improvement request."
+  },
+  {
+    "name": "docs",
+    "color": "0e7490",
+    "description": "Documentation, copy, guides, or README changes."
+  },
+  {
+    "name": "design",
+    "color": "7c3aed",
+    "description": "Product, interaction, or visual design discussion."
+  },
+  {
+    "name": "refactor",
+    "color": "6d28d9",
+    "description": "Code restructuring without intended behavior changes."
+  },
+  {
+    "name": "test",
+    "color": "15803d",
+    "description": "Tests or test configuration."
+  },
+  {
+    "name": "chore",
+    "color": "475569",
+    "description": "Repo maintenance or internal-only work."
+  },
+  {
+    "name": "area:web",
+    "color": "111827",
+    "description": "Next.js web app changes."
+  },
+  {
+    "name": "area:ui",
+    "color": "4f46e5",
+    "description": "Interface, layout, accessibility, or component changes."
+  },
+  {
+    "name": "area:docs",
+    "color": "0e7490",
+    "description": "Documentation and project guidance."
+  },
+  {
+    "name": "area:ai",
+    "color": "9333ea",
+    "description": "Eve, agent behavior, prompts, models, or AI guardrails."
+  },
+  {
+    "name": "area:demo",
+    "color": "ec4899",
+    "description": "Hackathon demo flow, pitch support, or seeded demo state."
+  },
+  {
+    "name": "area:supabase",
+    "color": "047857",
+    "description": "Supabase schema, SQL, RLS, storage, or client helpers."
+  },
+  {
+    "name": "area:ci",
+    "color": "334155",
+    "description": "GitHub Actions, release automation, or repo automation."
+  },
+  {
+    "name": "area:dependencies",
+    "color": "6b7280",
+    "description": "Dependency updates."
+  },
+  {
+    "name": "needs reproduction",
+    "color": "ca8a04",
+    "description": "Needs a minimal reproduction before it can move forward."
+  },
+  {
+    "name": "needs maintainer decision",
+    "color": "a16207",
+    "description": "Needs product or technical direction from the maintainer."
+  },
+  {
+    "name": "needs design review",
+    "color": "8b5cf6",
+    "description": "Needs product, UX, or visual review before implementation."
+  },
+  {
+    "name": "ready for review",
+    "color": "16a34a",
+    "description": "Ready for maintainer review."
+  },
+  {
+    "name": "blocked",
+    "color": "52525b",
+    "description": "Cannot move forward until a dependency or decision clears."
+  },
+  {
+    "name": "good first issue",
+    "color": "2e7d32",
+    "description": "Approachable for a first contribution."
+  },
+  {
+    "name": "help wanted",
+    "color": "0f766e",
+    "description": "Maintainers would welcome community help."
+  }
+]

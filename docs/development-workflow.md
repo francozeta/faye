@@ -52,6 +52,8 @@ CI:
 
 - `Verify` runs on pushes to `main`, pull requests, and manual dispatch.
 - CI installs dependencies from `pnpm-lock.yaml`, runs `pnpm check`, and checks whitespace.
+- `Sync Labels` keeps GitHub labels aligned with `.github/labels.json`.
+- `Labeler` applies area/type labels to pull requests once the workflow exists on `main`.
 
 ## Release Automation
 

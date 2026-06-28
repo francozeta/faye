@@ -35,6 +35,25 @@ area:ui:
           - app/globals.css
           - components/**
 
+area:ai:
+  - changed-files:
+      - any-glob-to-any-file:
+          - app/api/ai/**
+          - app/api/eve/**
+          - lib/ai/**
+          - lib/eve/**
+          - prompts/**
+
+area:demo:
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - docs/implementation-phases.md
+              - lib/demo/**
+              - public/demo/**
+      - head-branch:
+          - "^feat/demo"
+
 area:supabase:
   - changed-files:
       - any-glob-to-any-file:
