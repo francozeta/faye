@@ -65,3 +65,4 @@ Phase 1 is focused on the polished demo experience:
 - `docs/hackathon-context.md`
 - `docs/implementation-phases.md`
 - `docs/development-workflow.md`
+- `docs/research-notes.md`
