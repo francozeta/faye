@@ -166,7 +166,7 @@ export function FayeFlow({
   return (
     <TooltipProvider>
       <main className="min-h-dvh bg-background text-foreground">
-        <div className="mx-auto flex min-h-dvh w-full max-w-7xl flex-col px-4 py-4 sm:px-6 lg:px-8">
+        <div className="flex min-h-dvh w-full flex-col px-3 py-3 sm:px-4 lg:px-5">
           <AppHeader activeView={view} />
 
           <section
