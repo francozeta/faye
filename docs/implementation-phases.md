@@ -27,7 +27,7 @@ Deliverables:
 
 - First screen is the usable product, not a landing page.
 - Camera/upload or demo image entry point.
-- Eve result panel.
+- AI classification result panel.
 - Action instructions.
 - Progress/impact update.
 - Responsive, demo-ready UI.
@@ -39,7 +39,7 @@ Exit criteria:
 
 ## Phase 2: AI Demo-Safe Layer
 
-Goal: make Eve feel intelligent without risking the pitch.
+Goal: make FAYE feel intelligent without risking the pitch.
 
 Deliverables:
 
@@ -75,7 +75,7 @@ Goal: make FAYE feel like a real product.
 Deliverables:
 
 - Mobile-first layout polish.
-- Stable copy for Eve.
+- Stable FAYE-first copy.
 - Pitch mode or seeded demo state.
 - Screenshots and final QA checklist.
 

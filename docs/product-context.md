@@ -10,7 +10,7 @@ The strong demo date is June 30, 2026. The product priority is a small, reliable
 
 ## Product Thesis
 
-FAYE is not just a trash classifier or a recycling chatbot. FAYE is an environmental AI companion that helps people build real domestic classification and recycling habits.
+FAYE is not just a trash classifier or a recycling chatbot. FAYE is an environmental AI app that helps people build real domestic classification and recycling habits.
 
 The user problem is not only "what is this waste?" The real loop is:
 
@@ -21,11 +21,11 @@ The user problem is not only "what is this waste?" The real loop is:
 5. Motivation: the user should see progress.
 6. Repetition: the habit should become easier next time.
 
-## Eve
+## Eve / Internal AI Layer
 
-Eve is the intelligent face of FAYE. She should feel like a companion with memory, context, and human tone, not a generic chatbot.
+FAYE is the product the user and jury see. Eve is the invisible internal agent layer that powers classification, recommendations, memory, and tone. Eve can have a personality in the system design, but the MVP interface should present the experience as FAYE acting clearly and reliably.
 
-For the MVP, Eve should:
+For the MVP, the AI layer should:
 
 - Identify or infer the waste item from a photo or selected demo item.
 - Explain the category and disposal action in simple language.
@@ -51,8 +51,8 @@ The primary demo should be:
 
 1. User opens FAYE.
 2. User captures or uploads a photo of a residue.
-3. Eve identifies it or uses a safe demo fallback.
-4. Eve explains what it is, how to classify it, and what to do next.
+3. FAYE identifies it or uses a safe demo fallback.
+4. FAYE explains what it is, how to classify it, and what to do next.
 5. FAYE records the action.
 6. The UI updates habit progress, impact, streak, or reward.
 

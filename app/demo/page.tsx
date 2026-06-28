@@ -1,5 +1,5 @@
 import { FayeFlow } from "@/components/faye-flow"
 
-export function FayeDemo() {
+export default function DemoPage() {
   return <FayeFlow view="demo" />
 }

@@ -20,7 +20,7 @@
 
 - [x] **Step 1: Capture product context**
 
-Write the hackathon goal, Eve positioning, MVP demo loop, rubric criteria, and non-goals in `docs/product-context.md`.
+Write the hackathon goal, FAYE positioning, internal AI layer, MVP demo loop, rubric criteria, and non-goals in `docs/product-context.md`.
 
 - [x] **Step 2: Capture phases**
 
