@@ -1,4 +1,4 @@
 #!/usr/bin/env sh
 set -e
 
-pnpm check
+corepack pnpm check

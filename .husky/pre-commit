@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
 set -e
 
-pnpm check:quick
+corepack pnpm check:quick
 git diff --cached --check

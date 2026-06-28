@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FAYE
 
-## Getting Started
+FAYE is an environmental AI companion for Hackathon QuipuSoft 2026. Its purpose is to help people build real household waste classification and recycling habits.
 
-First, run the development server:
+The product is not a generic recycling chatbot. Eve is the intelligent layer inside FAYE: she identifies a residue, explains the correct action, helps the user act, records the habit, and makes progress visible.
+
+## Demo Thesis
+
+FAYE turns uncertainty into action, then turns repeated action into a measurable habit.
+
+Primary loop:
+
+1. Capture or upload a residue.
+2. Eve identifies it with confidence and context.
+3. Eve explains how to classify and prepare it.
+4. The user records the completed action.
+5. FAYE updates habit progress and impact.
+
+## Stack
+
+- Next.js 16 App Router.
+- React 19.
+- Tailwind CSS 4.
+- shadcn/base-ui components.
+- Supabase for persistence when it strengthens the demo.
+- Vercel AI Gateway through `AI_GATEWAY_API_KEY` when the AI layer is added.
+
+## Local Development
+
+Run the development server:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+corepack pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Useful checks:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+corepack pnpm check:quick
+corepack pnpm check
+```
 
-## Learn More
+## Workflow
 
-To learn more about Next.js, take a look at the following resources:
+- Use focused branches such as `feat/eve-demo-ui`, `fix/ci-build`, or `docs/product-context`.
+- Keep commits conventional, for example `feat: add eve demo ui`.
+- Open pull requests for meaningful product or automation changes.
+- Release automation is handled by Release Please after conventional commits land on `main`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Current Phase
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Phase 1 is focused on the polished demo experience:
 
-## Deploy on Vercel
+- A clear first screen.
+- A visible Eve decision loop.
+- Demo-safe residue scenarios.
+- Progress and impact feedback.
+- No chatbot-first interface.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Product Docs
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `docs/product-context.md`
+- `docs/hackathon-context.md`
+- `docs/implementation-phases.md`
+- `docs/development-workflow.md`
