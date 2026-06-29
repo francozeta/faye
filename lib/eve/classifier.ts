@@ -5,10 +5,11 @@ import { z } from "zod"
 
 import { demoResidueIds } from "@/lib/demo-residues"
 import {
+  buildEmptyInputResponse,
   buildFallbackClassification,
   getDemoResidueById,
 } from "@/lib/eve/fallback"
-import type { EveClassification, EveClassificationInput } from "@/lib/eve/types"
+import type { EveAnalysisResult, EveClassificationInput } from "@/lib/eve/types"
 
 export const DEFAULT_EVE_MODEL = "openai/gpt-5.4-mini"
 
@@ -16,6 +17,7 @@ export const eveClassificationInputSchema = z.object({
   residueId: z.enum(demoResidueIds).optional(),
   imageName: z.string().trim().min(1).max(160).optional(),
   imageHint: z.string().trim().min(1).max(500).optional(),
+  inputMode: z.enum(["image", "demo", "empty"]).optional(),
   locale: z.string().trim().min(2).max(16).default("es-PE"),
   forceFallback: z.boolean().default(false),
 })
@@ -60,7 +62,15 @@ export function isEveGatewayConfigured() {
 
 export async function classifyResidueWithEve(
   input: ParsedEveClassificationInput
-): Promise<EveClassification> {
+): Promise<EveAnalysisResult> {
+  const inputMode =
+    input.inputMode ??
+    (input.imageName ? "image" : input.residueId ? "demo" : "empty")
+
+  if (inputMode === "empty") {
+    return buildEmptyInputResponse()
+  }
+
   if (input.forceFallback) {
     return buildFallbackClassification(
       input,
@@ -94,6 +104,7 @@ export async function classifyResidueWithEve(
 
     return {
       ...output,
+      status: "classified",
       confidence: Math.round(output.confidence),
       points: Math.round(output.points),
       analyzedAt: new Date().toISOString(),

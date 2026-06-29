@@ -11,6 +11,8 @@ residue, explain the next action, and convert it into habit progress.
 - `FAYE_AI_MODEL` can override the default model (`openai/gpt-5.4-mini`).
 - `FAYE_AI_MODEL` must be a model id like `openai/gpt-5.4-mini`, never an API key.
 - If the gateway is missing or fails, FAYE returns a deterministic local answer.
+- If there is no image or demo input, Eve returns `needs_input` instead of
+  inventing a residue.
 
 ## Demo contract
 
@@ -23,6 +25,9 @@ The adapter returns the same shape used by the UI:
 - impact copy
 - habit copy
 - points/reward
+
+When there is no usable input, the adapter returns a compact `needs_input`
+message so the product feels responsive without hallucinating a classification.
 
 This keeps the demo stable while still letting Eve improve the language and
 decision quality when AI is available.

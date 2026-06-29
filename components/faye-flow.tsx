@@ -40,7 +40,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { demoResidues, type DemoResidue } from "@/lib/demo-residues"
-import type { EveClassification } from "@/lib/eve/types"
+import type {
+  EveAnalysisResult,
+  EveEmptyInputResponse,
+  EveInputMode,
+} from "@/lib/eve/types"
 import { cn } from "@/lib/utils"
 
 type FayeView = "scan" | "result" | "habit" | "demo"
@@ -114,12 +118,15 @@ export function FayeFlow({
     null
   )
   const [analysisResult, setAnalysisResult] =
-    React.useState<EveClassification | null>(null)
+    React.useState<EveAnalysisResult | null>(null)
 
   const selectedResidue =
     demoResidues.find((residue) => residue.id === selectedId) ?? demoResidues[0]
-  const activeResidue = analysisResult ?? selectedResidue
+  const activeResidue =
+    analysisResult?.status === "classified" ? analysisResult : selectedResidue
   const activeSource = analysisResult?.source ?? source
+  const inputNotice =
+    analysisResult?.status === "needs_input" ? analysisResult : null
   const isLogged = phase === "logged" || view === "habit"
   const progress = isLogged ? 76 : 64
   const streak = isLogged ? 4 : 3
@@ -137,12 +144,12 @@ export function FayeFlow({
     }
 
     try {
-      const parsed = JSON.parse(storedAnalysis) as EveClassification
+      const parsed = JSON.parse(storedAnalysis) as EveAnalysisResult
       const isKnownResidue = demoResidues.some(
-        (residue) => residue.id === parsed.id
+        (residue) => parsed.status === "classified" && residue.id === parsed.id
       )
 
-      if (isKnownResidue) {
+      if (parsed.status === "classified" && isKnownResidue) {
         const timeout = window.setTimeout(() => {
           setSelectedId(parsed.id)
           setAnalysisResult(parsed)
@@ -201,6 +208,11 @@ export function FayeFlow({
     const minimumDelay = new Promise((resolve) => {
       window.setTimeout(resolve, 650)
     })
+    const inputMode: EveInputMode = uploadPreview
+      ? "image"
+      : view === "demo"
+        ? "demo"
+        : "empty"
 
     try {
       const response = await fetch("/api/eve/classify", {
@@ -209,8 +221,9 @@ export function FayeFlow({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          residueId: selectedId,
+          residueId: inputMode === "empty" ? undefined : selectedId,
           imageName: uploadPreview?.name,
+          inputMode,
           locale: "es-PE",
         }),
       })
@@ -219,7 +232,16 @@ export function FayeFlow({
         throw new Error("Eve classification failed")
       }
 
-      const result = (await response.json()) as EveClassification
+      const result = (await response.json()) as EveAnalysisResult
+
+      if (result.status === "needs_input") {
+        await minimumDelay
+
+        setAnalysisResult(result)
+        window.sessionStorage.removeItem("faye:last-analysis")
+        return
+      }
+
       const isKnownResidue = demoResidues.some(
         (residue) => residue.id === result.id
       )
@@ -291,6 +313,7 @@ export function FayeFlow({
                     selectedId={selectedId}
                     uploadPreview={uploadPreview}
                     phase={phase}
+                    inputNotice={inputNotice}
                     onAnalyze={analyzeResidue}
                     onSelectResidue={selectResidue}
                     onUpload={handleUpload}
@@ -341,6 +364,7 @@ export function FayeFlow({
                     selectedId={selectedId}
                     uploadPreview={uploadPreview}
                     phase={phase}
+                    inputNotice={inputNotice}
                     onAnalyze={analyzeResidue}
                     onSelectResidue={selectResidue}
                     onUpload={handleUpload}
@@ -497,6 +521,7 @@ function ScanPanel({
   selectedId,
   uploadPreview,
   phase,
+  inputNotice,
   onAnalyze,
   onSelectResidue,
   onUpload,
@@ -506,6 +531,7 @@ function ScanPanel({
   selectedId: DemoResidue["id"]
   uploadPreview: UploadPreview | null
   phase: Phase
+  inputNotice: EveEmptyInputResponse | null
   onAnalyze: () => void
   onSelectResidue: (id: DemoResidue["id"]) => void
   onUpload: (event: React.ChangeEvent<HTMLInputElement>) => void
@@ -537,12 +563,32 @@ function ScanPanel({
       >
         <div className="flex min-h-0 flex-col justify-between rounded-md border border-border bg-muted/20 p-3">
           <div className="flex items-center justify-between gap-2">
-            <Badge variant="outline">{uploadPreview ? "Imagen subida" : "Vista demo"}</Badge>
-            <Badge variant="secondary">{selectedResidue.material}</Badge>
+            <Badge variant="outline">
+              {inputNotice
+                ? "Eve"
+                : uploadPreview
+                  ? "Imagen subida"
+                  : "Vista demo"}
+            </Badge>
+            <Badge variant="secondary">
+              {inputNotice ? "Sin entrada" : selectedResidue.material}
+            </Badge>
           </div>
 
           <div className="flex min-h-0 flex-1 items-center justify-center py-4">
-            {uploadPreview ? (
+            {inputNotice ? (
+              <div className="flex max-w-sm flex-col items-center gap-3 text-center">
+                <div className="grid size-12 place-items-center rounded-md bg-muted">
+                  <HugeiconsIcon icon={SparklesIcon} size={24} />
+                </div>
+                <div>
+                  <p className="text-base font-semibold">{inputNotice.title}</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {inputNotice.message}
+                  </p>
+                </div>
+              </div>
+            ) : uploadPreview ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={uploadPreview.url}
@@ -576,9 +622,19 @@ function ScanPanel({
 
           <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
             <span className="truncate">
-              {uploadPreview ? uploadPreview.name : selectedResidue.shortName}
+              {inputNotice
+                ? inputNotice.actionLabel
+                : uploadPreview
+                  ? uploadPreview.name
+                  : selectedResidue.shortName}
             </span>
-            <span className="shrink-0">{uploadPreview ? uploadPreview.sizeLabel : `${selectedResidue.confidence}%`}</span>
+            <span className="shrink-0">
+              {inputNotice
+                ? "Pendiente"
+                : uploadPreview
+                  ? uploadPreview.sizeLabel
+                  : `${selectedResidue.confidence}%`}
+            </span>
           </div>
         </div>
 
