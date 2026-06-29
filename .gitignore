@@ -27,6 +27,7 @@
 .eve/
 .output/
 .superpowers/
+agent/skills/
 skills-lock.json
 supabase/.temp/
 

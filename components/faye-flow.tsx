@@ -44,22 +44,96 @@ import type {
   EveAnalysisResult,
   EveEmptyInputResponse,
   EveInputMode,
+  ResidueDecision,
 } from "@/lib/eve/types"
 import { cn } from "@/lib/utils"
 
 type FayeView = "scan" | "result" | "habit" | "demo"
 type Phase = "ready" | "analyzing" | "logged"
 type UploadPreview = {
+  dataUrl: string
+  mediaType: string
   name: string
   sizeLabel: string
   url: string
 }
+type DisplayResidue = DemoResidue | ResidueDecision
 
 const scenarioIcons = {
   "pet-bottle": Recycle01Icon,
   "paper-receipt": WasteIcon,
   "organic-scraps": Leaf01Icon,
 } satisfies Record<DemoResidue["id"], typeof Recycle01Icon>
+
+function getResidueIcon(id: string) {
+  return scenarioIcons[id as DemoResidue["id"]] ?? WasteIcon
+}
+
+function isDemoResidueId(value: string): value is DemoResidue["id"] {
+  return demoResidues.some((residue) => residue.id === value)
+}
+
+async function createImagePayload(file: File) {
+  const url = URL.createObjectURL(file)
+
+  try {
+    const image = await loadImage(url)
+    const maxDimension = 1280
+    const scale = Math.min(
+      1,
+      maxDimension / Math.max(image.naturalWidth, image.naturalHeight)
+    )
+    const canvas = document.createElement("canvas")
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+
+    const context = canvas.getContext("2d")
+
+    if (!context) {
+      throw new Error("Canvas context unavailable")
+    }
+
+    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/jpeg", 0.82)
+    })
+
+    if (!blob) {
+      throw new Error("Canvas export unavailable")
+    }
+
+    return {
+      dataUrl: await readBlobAsDataUrl(blob),
+      mediaType: blob.type,
+      url,
+    }
+  } catch {
+    return {
+      dataUrl: await readBlobAsDataUrl(file),
+      mediaType: file.type || "image",
+      url,
+    }
+  }
+}
+
+function loadImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => resolve(image)
+    image.onerror = () => reject(new Error("Image load failed"))
+    image.src = src
+  })
+}
+
+function readBlobAsDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(blob)
+  })
+}
 
 const navItems: Array<{ href: string; label: string; view: FayeView }> = [
   { href: "/scan", label: "Entrada", view: "scan" },
@@ -145,13 +219,12 @@ export function FayeFlow({
 
     try {
       const parsed = JSON.parse(storedAnalysis) as EveAnalysisResult
-      const isKnownResidue = demoResidues.some(
-        (residue) => parsed.status === "classified" && residue.id === parsed.id
-      )
-
-      if (parsed.status === "classified" && isKnownResidue) {
+      if (parsed.status === "classified") {
         const timeout = window.setTimeout(() => {
-          setSelectedId(parsed.id)
+          if (isDemoResidueId(parsed.id)) {
+            setSelectedId(parsed.id)
+          }
+
           setAnalysisResult(parsed)
         }, 0)
 
@@ -178,7 +251,7 @@ export function FayeFlow({
     setPhase("ready")
   }
 
-  function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0]
 
     if (!file) {
@@ -187,15 +260,19 @@ export function FayeFlow({
       return
     }
 
+    const imagePayload = await createImagePayload(file)
+
     setUploadPreview((current) => {
       if (current?.url) {
         URL.revokeObjectURL(current.url)
       }
 
       return {
+        dataUrl: imagePayload.dataUrl,
+        mediaType: imagePayload.mediaType,
         name: file.name,
         sizeLabel: `${Math.max(file.size / 1024 / 1024, 0.01).toFixed(2)} MB`,
-        url: URL.createObjectURL(file),
+        url: imagePayload.url,
       }
     })
     setAnalysisResult(null)
@@ -221,7 +298,9 @@ export function FayeFlow({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          residueId: inputMode === "empty" ? undefined : selectedId,
+          residueId: inputMode === "demo" ? selectedId : undefined,
+          imageDataUrl: uploadPreview?.dataUrl,
+          imageMediaType: uploadPreview?.mediaType,
           imageName: uploadPreview?.name,
           inputMode,
           locale: "es-PE",
@@ -242,22 +321,19 @@ export function FayeFlow({
         return
       }
 
-      const isKnownResidue = demoResidues.some(
-        (residue) => residue.id === result.id
-      )
-
-      if (!isKnownResidue) {
-        throw new Error("Unknown residue returned by Eve")
-      }
-
       await minimumDelay
 
-      setSelectedId(result.id)
+      if (isDemoResidueId(result.id)) {
+        setSelectedId(result.id)
+      }
+
       setAnalysisResult(result)
       window.sessionStorage.setItem("faye:last-analysis", JSON.stringify(result))
 
       if (view !== "demo") {
-        router.push(`/result?item=${result.id}&source=${result.source}`)
+        const routeResidueId = isDemoResidueId(result.id) ? result.id : selectedId
+
+        router.push(`/result?item=${routeResidueId}&source=${result.source}`)
       }
     } catch {
       await minimumDelay
@@ -404,7 +480,7 @@ function AppHeader({
   progress,
 }: {
   activeView: FayeView
-  selectedResidue: DemoResidue
+  selectedResidue: DisplayResidue
   points: number
   progress: number
 }) {
@@ -464,7 +540,7 @@ function WorkspaceHeader({
   selectedResidue,
 }: {
   view: FayeView
-  selectedResidue: DemoResidue
+  selectedResidue: DisplayResidue
 }) {
   const copy = workspaceCopy[view]
 
@@ -527,7 +603,7 @@ function ScanPanel({
   onUpload,
   compact = false,
 }: {
-  selectedResidue: DemoResidue
+  selectedResidue: DisplayResidue
   selectedId: DemoResidue["id"]
   uploadPreview: UploadPreview | null
   phase: Phase
@@ -607,7 +683,7 @@ function ScanPanel({
               >
                 <div className="flex flex-col items-center gap-2 text-center">
                   <div className="grid size-12 place-items-center rounded-md bg-muted">
-                    <HugeiconsIcon icon={scenarioIcons[selectedResidue.id]} size={24} />
+                    <HugeiconsIcon icon={getResidueIcon(selectedResidue.id)} size={24} />
                   </div>
                   <div>
                     <p className="text-2xl font-semibold">{selectedResidue.visual.label}</p>
@@ -681,7 +757,7 @@ function ScanPanel({
                   data-testid={`residue-${residue.id}`}
                   className="h-auto w-full justify-start px-3 py-2 text-left"
                 >
-                  <HugeiconsIcon icon={scenarioIcons[residue.id]} data-icon="inline-start" />
+                  <HugeiconsIcon icon={getResidueIcon(residue.id)} data-icon="inline-start" />
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate">{residue.shortName}</span>
                     <span className="truncate text-muted-foreground">
@@ -717,7 +793,7 @@ function ResultPanel({
   onRecord,
   compact = false,
 }: {
-  selectedResidue: DemoResidue
+  selectedResidue: DisplayResidue
   phase: Phase
   source: string | null
   onAnalyze: () => void
@@ -843,7 +919,7 @@ function HabitPanel({
   streak,
   compact = false,
 }: {
-  selectedResidue: DemoResidue
+  selectedResidue: DisplayResidue
   phase: Phase
   loggedCount: number
   points: number
@@ -940,7 +1016,7 @@ function FlowAside() {
   )
 }
 
-function ResultSummary({ selectedResidue }: { selectedResidue: DemoResidue }) {
+function ResultSummary({ selectedResidue }: { selectedResidue: DisplayResidue }) {
   return (
     <section className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <PanelHeader
@@ -951,7 +1027,7 @@ function ResultSummary({ selectedResidue }: { selectedResidue: DemoResidue }) {
         <DecisionMetric
           label="Residuo"
           value={selectedResidue.name}
-          icon={scenarioIcons[selectedResidue.id]}
+          icon={getResidueIcon(selectedResidue.id)}
         />
         <DecisionMetric label="Destino" value={selectedResidue.bin} icon={WasteIcon} />
         <Link
