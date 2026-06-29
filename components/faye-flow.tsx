@@ -40,6 +40,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { demoResidues, type DemoResidue } from "@/lib/demo-residues"
+import type { EveClassification } from "@/lib/eve/types"
 import { cn } from "@/lib/utils"
 
 type FayeView = "scan" | "result" | "habit" | "demo"
@@ -112,13 +113,49 @@ export function FayeFlow({
   const [uploadPreview, setUploadPreview] = React.useState<UploadPreview | null>(
     null
   )
+  const [analysisResult, setAnalysisResult] =
+    React.useState<EveClassification | null>(null)
 
   const selectedResidue =
     demoResidues.find((residue) => residue.id === selectedId) ?? demoResidues[0]
+  const activeResidue = analysisResult ?? selectedResidue
+  const activeSource = analysisResult?.source ?? source
   const isLogged = phase === "logged" || view === "habit"
   const progress = isLogged ? 76 : 64
   const streak = isLogged ? 4 : 3
-  const points = 146 + (isLogged ? selectedResidue.points : 0)
+  const points = 146 + (isLogged ? activeResidue.points : 0)
+
+  React.useEffect(() => {
+    if (view === "scan") {
+      return
+    }
+
+    const storedAnalysis = window.sessionStorage.getItem("faye:last-analysis")
+
+    if (!storedAnalysis) {
+      return
+    }
+
+    try {
+      const parsed = JSON.parse(storedAnalysis) as EveClassification
+      const isKnownResidue = demoResidues.some(
+        (residue) => residue.id === parsed.id
+      )
+
+      if (isKnownResidue) {
+        const timeout = window.setTimeout(() => {
+          setSelectedId(parsed.id)
+          setAnalysisResult(parsed)
+        }, 0)
+
+        return () => {
+          window.clearTimeout(timeout)
+        }
+      }
+    } catch {
+      window.sessionStorage.removeItem("faye:last-analysis")
+    }
+  }, [view])
 
   React.useEffect(() => {
     return () => {
@@ -130,6 +167,7 @@ export function FayeFlow({
 
   function selectResidue(nextValue: DemoResidue["id"]) {
     setSelectedId(nextValue)
+    setAnalysisResult(null)
     setPhase("ready")
   }
 
@@ -138,6 +176,7 @@ export function FayeFlow({
 
     if (!file) {
       setUploadPreview(null)
+      setAnalysisResult(null)
       return
     }
 
@@ -152,20 +191,62 @@ export function FayeFlow({
         url: URL.createObjectURL(file),
       }
     })
+    setAnalysisResult(null)
     window.sessionStorage.setItem("faye:last-upload-name", file.name)
   }
 
-  function analyzeResidue() {
+  async function analyzeResidue() {
     setPhase("analyzing")
 
-    window.setTimeout(() => {
-      setPhase("ready")
+    const minimumDelay = new Promise((resolve) => {
+      window.setTimeout(resolve, 650)
+    })
+
+    try {
+      const response = await fetch("/api/eve/classify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          residueId: selectedId,
+          imageName: uploadPreview?.name,
+          locale: "es-PE",
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Eve classification failed")
+      }
+
+      const result = (await response.json()) as EveClassification
+      const isKnownResidue = demoResidues.some(
+        (residue) => residue.id === result.id
+      )
+
+      if (!isKnownResidue) {
+        throw new Error("Unknown residue returned by Eve")
+      }
+
+      await minimumDelay
+
+      setSelectedId(result.id)
+      setAnalysisResult(result)
+      window.sessionStorage.setItem("faye:last-analysis", JSON.stringify(result))
 
       if (view !== "demo") {
-        const source = uploadPreview ? "&source=upload" : ""
-        router.push(`/result?item=${selectedId}${source}`)
+        router.push(`/result?item=${result.id}&source=${result.source}`)
       }
-    }, 650)
+    } catch {
+      await minimumDelay
+
+      if (view !== "demo") {
+        const routeSource = uploadPreview ? "&source=upload" : ""
+        router.push(`/result?item=${selectedId}${routeSource}`)
+      }
+    } finally {
+      setPhase("ready")
+    }
   }
 
   function recordAction() {
@@ -177,7 +258,7 @@ export function FayeFlow({
     setLoggedCount((current) => Math.max(current, 8) + 1)
 
     if (view !== "demo") {
-      router.push(`/habit?item=${selectedId}`)
+      router.push(`/habit?item=${activeResidue.id}`)
     }
   }
 
@@ -187,13 +268,13 @@ export function FayeFlow({
         <div className="grid h-dvh w-full grid-rows-[auto_minmax(0,1fr)] items-stretch gap-2 overflow-hidden p-2 lg:grid-cols-[204px_minmax(0,1fr)] lg:grid-rows-1 lg:gap-3 lg:p-4">
           <AppHeader
             activeView={view}
-            selectedResidue={selectedResidue}
+            selectedResidue={activeResidue}
             points={points}
             progress={progress}
           />
 
           <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card/30 shadow-sm lg:h-[calc(100dvh-2rem)]">
-            <WorkspaceHeader view={view} selectedResidue={selectedResidue} />
+            <WorkspaceHeader view={view} selectedResidue={activeResidue} />
 
             <div
               className={cn(
@@ -221,14 +302,14 @@ export function FayeFlow({
               {view === "result" && (
                 <>
                   <ResultPanel
-                    selectedResidue={selectedResidue}
+                    selectedResidue={activeResidue}
                     phase={phase}
-                    source={source}
+                    source={activeSource}
                     onAnalyze={analyzeResidue}
                     onRecord={recordAction}
                   />
                   <HabitPanel
-                    selectedResidue={selectedResidue}
+                    selectedResidue={activeResidue}
                     phase={phase}
                     loggedCount={loggedCount}
                     points={points}
@@ -242,14 +323,14 @@ export function FayeFlow({
               {view === "habit" && (
                 <>
                   <HabitPanel
-                    selectedResidue={selectedResidue}
+                    selectedResidue={activeResidue}
                     phase="logged"
                     loggedCount={loggedCount}
                     points={points}
                     progress={progress}
                     streak={streak}
                   />
-                  <ResultSummary selectedResidue={selectedResidue} />
+                  <ResultSummary selectedResidue={activeResidue} />
                 </>
               )}
 
@@ -266,15 +347,15 @@ export function FayeFlow({
                     compact
                   />
                   <ResultPanel
-                    selectedResidue={selectedResidue}
+                    selectedResidue={activeResidue}
                     phase={phase}
-                    source={uploadPreview ? "upload" : null}
+                    source={analysisResult?.source ?? (uploadPreview ? "upload" : null)}
                     onAnalyze={analyzeResidue}
                     onRecord={recordAction}
                     compact
                   />
                   <HabitPanel
-                    selectedResidue={selectedResidue}
+                    selectedResidue={activeResidue}
                     phase={phase}
                     loggedCount={loggedCount}
                     points={points}
@@ -594,7 +675,13 @@ function ResultPanel({
         description="Destino y accion."
         action={
           <Badge variant={phase === "analyzing" ? "secondary" : "default"}>
-            {phase === "analyzing" ? "Analizando" : source === "upload" ? "Imagen" : "Demo"}
+            {phase === "analyzing"
+              ? "Analizando"
+              : source === "ai" || source === "fallback"
+                ? "Eve"
+                : source === "upload"
+                  ? "Imagen"
+                  : "Demo"}
           </Badge>
         }
       />

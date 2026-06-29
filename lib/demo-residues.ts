@@ -1,5 +1,13 @@
+export const demoResidueIds = [
+  "pet-bottle",
+  "paper-receipt",
+  "organic-scraps",
+] as const
+
+export type DemoResidueId = (typeof demoResidueIds)[number]
+
 export type DemoResidue = {
-  id: "pet-bottle" | "paper-receipt" | "organic-scraps"
+  id: DemoResidueId
   name: string
   shortName: string
   material: string

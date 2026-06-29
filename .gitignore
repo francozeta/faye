@@ -24,6 +24,8 @@
 .DS_Store
 *.pem
 .agents/
+.eve/
+.output/
 .superpowers/
 skills-lock.json
 supabase/.temp/
