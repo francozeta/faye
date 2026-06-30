@@ -5,6 +5,8 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   AiScanIcon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
   CheckmarkCircle02Icon,
   Leaf01Icon,
   Recycle01Icon,
@@ -37,7 +39,7 @@ import type {
 import { cn } from "@/lib/utils"
 
 type FayeView = "scan" | "result" | "habit" | "demo"
-type Phase = "ready" | "analyzing" | "logged"
+type Phase = "ready" | "analyzing" | "recording" | "logged"
 type UploadPreview = {
   dataUrl: string
   mediaType: string
@@ -48,9 +50,11 @@ type UploadPreview = {
 type DisplayResidue = DemoResidue | ResidueDecision
 type StoredHabit = {
   count: number
+  lastSyncedAt?: string
   points: number
   progress: number
   streak: number
+  synced?: boolean
 }
 
 const emptyHabit: StoredHabit = {
@@ -58,6 +62,7 @@ const emptyHabit: StoredHabit = {
   points: 0,
   progress: 0,
   streak: 0,
+  synced: false,
 }
 
 const scenarioIcons = {
@@ -132,6 +137,23 @@ function readBlobAsDataUrl(blob: Blob) {
   })
 }
 
+function getOrCreateDeviceId() {
+  const storageKey = "faye:device-id"
+  const storedId = window.localStorage.getItem(storageKey)
+
+  if (storedId) {
+    return storedId
+  }
+
+  const nextId =
+    window.crypto.randomUUID?.() ??
+    `device-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+  window.localStorage.setItem(storageKey, nextId)
+
+  return nextId
+}
+
 function residueKind(residue: DisplayResidue) {
   return residue.category || residue.material || residue.shortName
 }
@@ -191,6 +213,12 @@ export function FayeFlow({
   const inputNotice =
     analysisResult?.status === "needs_input" ? analysisResult : null
   const isLogged = phase === "logged" || habit.count > 0
+  const flowStarted = Boolean(uploadPreview || activeResidue)
+  const canGoBack =
+    Boolean(activeResidue) && (view === "result" || view === "habit")
+  const canGoForward =
+    Boolean(activeResidue) &&
+    (view === "scan" || (view === "result" && isLogged))
 
   React.useEffect(() => {
     if (view === "scan") {
@@ -318,23 +346,89 @@ export function FayeFlow({
     }
   }
 
-  function recordAction() {
+  async function recordAction() {
     if (!activeResidue || (isLogged && view === "demo")) {
       return
     }
 
-    setPhase("logged")
+    setPhase("recording")
+
     const nextHabit = {
       count: habit.count + 1,
       points: habit.points + activeResidue.points,
       progress: Math.min(100, habit.progress + 16),
       streak: Math.max(1, habit.streak),
     }
+    let synced = false
 
-    setHabit(nextHabit)
-    window.sessionStorage.setItem("faye:habit", JSON.stringify(nextHabit))
+    try {
+      const response = await fetch("/api/habit/events", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          deviceId: getOrCreateDeviceId(),
+          residue: {
+            id: activeResidue.id,
+            name: activeResidue.name,
+            material: activeResidue.material,
+            category: activeResidue.category,
+            bin: activeResidue.bin,
+            points: activeResidue.points,
+            confidence: activeResidue.confidence,
+            preparation: activeResidue.preparation,
+            impact: activeResidue.impact,
+            source: activeResidue.source,
+          },
+        }),
+      })
+      const result = (await response.json()) as { persisted?: boolean }
+
+      synced = response.ok && Boolean(result.persisted)
+    } catch {
+      synced = false
+    }
+
+    const storedHabit = {
+      ...nextHabit,
+      lastSyncedAt: new Date().toISOString(),
+      synced,
+    }
+
+    setPhase("logged")
+    setHabit(storedHabit)
+    window.sessionStorage.setItem("faye:habit", JSON.stringify(storedHabit))
 
     if (view !== "demo") {
+      router.push("/habit")
+    }
+  }
+
+  function goToPreviousStep() {
+    if (!canGoBack) {
+      return
+    }
+
+    if (view === "habit") {
+      router.push("/result")
+      return
+    }
+
+    router.push("/scan")
+  }
+
+  function goToNextStep() {
+    if (!canGoForward) {
+      return
+    }
+
+    if (view === "scan") {
+      router.push("/result")
+      return
+    }
+
+    if (view === "result") {
       router.push("/habit")
     }
   }
@@ -347,7 +441,14 @@ export function FayeFlow({
         />
 
         <section className="grid h-full min-h-0 grid-rows-[36px_minmax(0,1fr)] overflow-hidden px-2 pb-2 sm:grid-rows-[40px_minmax(0,1fr)] sm:px-3 sm:pb-3">
-          <FayeMainHeader view={view} />
+          <FayeMainHeader
+            canGoBack={canGoBack}
+            canGoForward={canGoForward}
+            flowStarted={flowStarted}
+            onBack={goToPreviousStep}
+            onForward={goToNextStep}
+            view={view}
+          />
 
           <div className="min-h-0 overflow-hidden">
             {view === "scan" ? (
@@ -487,62 +588,63 @@ function FayeTopBar({
       </div>
 
       <div className="flex min-w-0 items-center justify-end gap-1.5">
-        <Button size="sm">
-          Login
-        </Button>
+        <Badge variant="outline">Invitado</Badge>
       </div>
     </header>
   )
 }
 
 function FayeMainHeader({
+  canGoBack,
+  canGoForward,
+  flowStarted,
+  onBack,
+  onForward,
   view,
 }: {
+  canGoBack: boolean
+  canGoForward: boolean
+  flowStarted: boolean
+  onBack: () => void
+  onForward: () => void
   view: FayeView
 }) {
-  const activeView = view === "demo" ? "scan" : view
-  const navItems = [
-    { href: "/scan", label: "Scan", view: "scan" },
-    { href: "/result", label: "Result", view: "result" },
-    { href: "/habit", label: "Habit", view: "habit" },
-  ] as const
   const viewLabel =
     view === "result" ? "Resultado" : view === "habit" ? "Habito" : "Entrada"
 
   return (
-    <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center px-1">
-      <p className="hidden truncate text-xs font-medium text-muted-foreground sm:block">
+    <div className="flex min-h-0 items-center justify-between gap-3 px-1">
+      <p className="truncate text-xs font-medium text-muted-foreground">
         {viewLabel}
       </p>
 
-      <nav
-        aria-label="Navegacion principal"
-        className="flex items-center gap-1 rounded-md border border-border bg-card/20 p-0.5"
-      >
-        {navItems.map((item) => {
-          const isActive = activeView === item.view
-
-          return (
-            <Link
-              aria-current={isActive ? "page" : undefined}
-              className={cn(
-                buttonVariants({
-                  size: "sm",
-                  variant: isActive ? "secondary" : "ghost",
-                }),
-                "h-6 px-2",
-                !isActive && "text-muted-foreground"
-              )}
-              href={item.href}
-              key={item.href}
-            >
-              {item.label}
-            </Link>
-          )
-        })}
-      </nav>
-
-      <div aria-hidden="true" />
+      {flowStarted ? (
+        <div
+          aria-label="Flujo"
+          className="flex items-center gap-1 rounded-md border border-border bg-card/20 p-0.5"
+        >
+          <Button
+            aria-label="Volver al paso anterior"
+            disabled={!canGoBack}
+            onClick={onBack}
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+          >
+            <HugeiconsIcon icon={ArrowLeft01Icon} />
+          </Button>
+          <Button
+            aria-label="Avanzar al siguiente paso"
+            disabled={!canGoForward}
+            onClick={onForward}
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+          >
+            <HugeiconsIcon icon={ArrowRight01Icon} />
+          </Button>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -616,6 +718,7 @@ function ResultPanel({
   compact?: boolean
 }) {
   const isAnalyzing = phase === "analyzing"
+  const isRecording = phase === "recording"
 
   return (
     <section className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-border bg-card/20">
@@ -662,7 +765,7 @@ function ResultPanel({
         <Button
           variant="outline"
           onClick={onAnalyze}
-          disabled={isAnalyzing}
+          disabled={isAnalyzing || isRecording}
           className="h-9"
         >
           <HugeiconsIcon icon={AiScanIcon} data-icon="inline-start" />
@@ -670,12 +773,15 @@ function ResultPanel({
         </Button>
         <Button
           onClick={onRecord}
-          disabled={isAnalyzing}
+          disabled={isAnalyzing || isRecording}
           data-testid="record-action"
           className="h-9"
         >
-          <HugeiconsIcon icon={CheckmarkCircle02Icon} data-icon="inline-start" />
-          Registrar
+          <HugeiconsIcon
+            icon={isRecording ? SparklesIcon : CheckmarkCircle02Icon}
+            data-icon="inline-start"
+          />
+          {isRecording ? "Registrando" : "Registrar"}
         </Button>
       </div>
     </section>
@@ -699,7 +805,12 @@ function HabitPanel({
     <section className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-border bg-card/20">
       <div className="flex h-12 items-center justify-between gap-3 px-3">
         <p className="text-xs font-semibold">Habit</p>
-        <Badge variant="outline">{habit.points} pts</Badge>
+        <div className="flex items-center gap-1">
+          {habit.count > 0 ? (
+            <Badge variant="secondary">Registrado</Badge>
+          ) : null}
+          <Badge variant="outline">{habit.points} pts</Badge>
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-col gap-3 overflow-hidden p-3 pt-0 sm:gap-4">
