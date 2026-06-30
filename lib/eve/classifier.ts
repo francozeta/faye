@@ -88,6 +88,45 @@ const eveAnalysisOutputSchema = z.discriminatedUnion("status", [
   eveNeedsInputOutputSchema,
 ])
 
+const rawEveClassificationOutputSchema = z
+  .object({
+    status: z.literal("classified"),
+    id: z.unknown().optional(),
+    name: z.unknown().optional(),
+    shortName: z.unknown().optional(),
+    material: z.unknown().optional(),
+    category: z.unknown().optional(),
+    bin: z.unknown().optional(),
+    confidence: z.unknown().optional(),
+    preparation: z.unknown().optional(),
+    rationale: z.unknown().optional(),
+    habit: z.unknown().optional(),
+    impact: z.unknown().optional(),
+    reward: z.unknown().optional(),
+    points: z.unknown().optional(),
+    visual: z
+      .object({
+        label: z.unknown().optional(),
+        detail: z.unknown().optional(),
+      })
+      .optional(),
+  })
+  .passthrough()
+
+const rawEveNeedsInputOutputSchema = z
+  .object({
+    status: z.literal("needs_input"),
+    title: z.unknown().optional(),
+    message: z.unknown().optional(),
+    actionLabel: z.unknown().optional(),
+  })
+  .passthrough()
+
+const rawEveAnalysisOutputSchema = z.discriminatedUnion("status", [
+  rawEveClassificationOutputSchema,
+  rawEveNeedsInputOutputSchema,
+])
+
 export type ParsedEveClassificationInput = z.infer<
   typeof eveClassificationInputSchema
 >
@@ -263,7 +302,7 @@ export async function classifyResidueWithEve(
         ],
         providerOptions: withModeTag(candidate.providerOptions, inputMode),
       })
-      const output = parseEveOutput(text)
+      const output = parseEveOutput(text, seed)
 
       if (output.status === "needs_input") {
         return {
@@ -297,7 +336,7 @@ export async function classifyResidueWithEve(
   if (inputMode === "image") {
     return buildEmptyInputResponse({
       fallbackReason:
-        "Gateway no pudo completar vision; Eve evito inventar una clasificacion.",
+        "Los proveedores de IA no pudieron completar vision; Eve evito inventar una clasificacion.",
       message:
         "No pude analizar esa imagen con suficiente confianza. Intenta otra foto con el residuo centrado y buena luz.",
       title: "No pude confirmar el residuo",
@@ -310,10 +349,57 @@ export async function classifyResidueWithEve(
   )
 }
 
-function parseEveOutput(rawText: string) {
+function parseEveOutput(
+  rawText: string,
+  seed: ReturnType<typeof getDemoResidueById>
+) {
   const parsedJson = JSON.parse(extractJsonObject(rawText)) as unknown
+  const rawOutput = rawEveAnalysisOutputSchema.parse(parsedJson)
 
-  return eveAnalysisOutputSchema.parse(parsedJson)
+  if (rawOutput.status === "needs_input") {
+    return eveAnalysisOutputSchema.parse({
+      status: "needs_input",
+      title: cleanText(rawOutput.title, "No veo un residuo claro", 80),
+      message: cleanText(
+        rawOutput.message,
+        "Sube otra foto donde el residuo este centrado y visible.",
+        180
+      ),
+      actionLabel: cleanText(rawOutput.actionLabel, "Agrega una imagen", 40),
+    })
+  }
+
+  const name = cleanText(rawOutput.name, seed.name, 80)
+  const shortName = cleanText(rawOutput.shortName, name, 32)
+  const material = cleanText(rawOutput.material, seed.material, 48)
+  const category = cleanText(rawOutput.category, seed.category, 56)
+  const bin = cleanText(rawOutput.bin, seed.bin, 64)
+  const points = toBoundedInteger(rawOutput.points, seed.points, 0, 30)
+
+  return eveAnalysisOutputSchema.parse({
+    status: "classified",
+    id: cleanKebabId(rawOutput.id, shortName),
+    name,
+    shortName,
+    material,
+    category,
+    bin,
+    confidence: toBoundedInteger(rawOutput.confidence, seed.confidence, 0, 100),
+    preparation: cleanText(rawOutput.preparation, seed.preparation, 180),
+    rationale: cleanText(rawOutput.rationale, seed.rationale, 240),
+    habit: cleanText(rawOutput.habit, seed.habit, 140),
+    impact: cleanText(rawOutput.impact, seed.impact, 140),
+    reward: cleanText(rawOutput.reward, `+${points} puntos de habito`, 40),
+    points,
+    visual: {
+      label: cleanVisualLabel(
+        rawOutput.visual?.label,
+        `${material} ${name} ${category}`,
+        seed.visual.label
+      ),
+      detail: cleanText(rawOutput.visual?.detail, material, 24),
+    },
+  })
 }
 
 function extractJsonObject(rawText: string) {
@@ -347,6 +433,68 @@ function withModeTag(
       tags: ["feature:eve-classifier", `mode:${inputMode}`],
     },
   }
+}
+
+function cleanText(value: unknown, fallback: string, maxLength: number) {
+  const text = typeof value === "string" ? value.trim() : ""
+  const safeText = text || fallback
+
+  return safeText.length > maxLength ? safeText.slice(0, maxLength).trim() : safeText
+}
+
+function cleanKebabId(value: unknown, fallback: string) {
+  const text = cleanText(value, fallback, 48)
+  const id = text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+
+  return id || "residuo-domestico"
+}
+
+function cleanVisualLabel(value: unknown, context: string, fallback: string) {
+  const text = typeof value === "string" ? value.trim() : ""
+
+  if (text && text.length <= 12) {
+    return text
+  }
+
+  const normalized = `${text} ${context}`
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+
+  if (normalized.includes("pet")) return "PET"
+  if (normalized.includes("plast")) return "PLA"
+  if (normalized.includes("vidrio")) return "VID"
+  if (normalized.includes("metal") || normalized.includes("lata")) return "MET"
+  if (normalized.includes("carton")) return "CAR"
+  if (normalized.includes("papel")) return "PAP"
+  if (normalized.includes("organic")) return "ORG"
+
+  return cleanText(fallback, "RES", 12)
+}
+
+function toBoundedInteger(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number
+) {
+  const numericValue =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseFloat(value)
+        : Number.NaN
+
+  if (!Number.isFinite(numericValue)) {
+    return fallback
+  }
+
+  return Math.min(max, Math.max(min, Math.round(numericValue)))
 }
 
 function buildUserContent(
