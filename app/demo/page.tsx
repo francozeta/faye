@@ -1,5 +1,5 @@
-import { FayeFlow } from "@/components/faye-flow"
+import { redirect } from "next/navigation"
 
 export default function DemoPage() {
-  return <FayeFlow view="demo" />
+  redirect("/scan")
 }
