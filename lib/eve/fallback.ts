@@ -6,6 +6,7 @@ import {
 
 import type {
   EveClassification,
+  EveClassificationSource,
   EveClassificationInput,
   EveEmptyInputResponse,
 } from "./types"
@@ -37,17 +38,29 @@ export function buildFallbackClassification(
   }
 }
 
-export function buildEmptyInputResponse(
-  fallbackReason = "Eve no recibio una imagen ni un residuo demo."
-): EveEmptyInputResponse {
+export function buildEmptyInputResponse({
+  actionLabel = "Agrega una imagen",
+  fallbackReason = "Eve no recibio una imagen ni un residuo demo.",
+  message = "Sube una foto o usa un residuo demo para que FAYE pueda clasificarlo con confianza.",
+  model,
+  source = "fallback",
+  title = "No veo un residuo todavia",
+}: {
+  actionLabel?: string
+  fallbackReason?: string
+  message?: string
+  model?: string
+  source?: EveClassificationSource
+  title?: string
+} = {}): EveEmptyInputResponse {
   return {
     status: "needs_input",
     analyzedAt: new Date().toISOString(),
-    source: "fallback",
-    title: "No veo un residuo todavia",
-    message:
-      "Sube una foto o usa un residuo demo para que FAYE pueda clasificarlo con confianza.",
-    actionLabel: "Agrega una imagen",
+    source,
+    model,
+    title,
+    message,
+    actionLabel,
     fallbackReason,
   }
 }

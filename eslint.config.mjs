@@ -11,6 +11,7 @@ const eslintConfig = defineConfig([
     ".next/**",
     ".eve/**",
     ".output/**",
+    "agent/skills/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
