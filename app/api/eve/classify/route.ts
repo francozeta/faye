@@ -3,7 +3,14 @@ import { NextResponse } from "next/server"
 import {
   classifyResidueWithEve,
   eveClassificationInputSchema,
+  getEveGoogleModel,
   getEveModel,
+  getEveModelCandidates,
+  getEveOpenAiModel,
+  getEveProviderPreference,
+  hasGoogleDirectKey,
+  hasOpenAiDirectKey,
+  isEveAiConfigured,
   isEveGatewayConfigured,
 } from "@/lib/eve/classifier"
 
@@ -15,6 +22,21 @@ export async function GET() {
     ok: true,
     agent: "eve",
     model: getEveModel(),
+    providerPreference: getEveProviderPreference(),
+    directModels: {
+      google: getEveGoogleModel(),
+      openai: getEveOpenAiModel(),
+    },
+    configured: {
+      ai: isEveAiConfigured(),
+      gateway: isEveGatewayConfigured(),
+      google: hasGoogleDirectKey(),
+      openai: hasOpenAiDirectKey(),
+    },
+    candidates: getEveModelCandidates().map((candidate) => ({
+      id: candidate.id,
+      provider: candidate.provider,
+    })),
     aiGatewayConfigured: isEveGatewayConfigured(),
   })
 }

@@ -7,10 +7,21 @@ residue, explain the next action, and convert it into habit progress.
 
 - `agent/` holds the durable Eve source of truth.
 - `/api/eve/classify` is the product-facing adapter used by the UI.
-- `AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN` enables real AI through Vercel AI Gateway.
-- `FAYE_AI_MODEL` can override the default model (`openai/gpt-5.4-mini`).
-- `FAYE_AI_MODEL` must be a model id like `openai/gpt-5.4-mini`, never an API key.
-- If the gateway is missing or fails, FAYE returns a deterministic local answer.
+- `FAYE_AI_PROVIDER` controls provider preference: `auto`, `google`,
+  `openai`, or `gateway`. The default is `auto`.
+- `GOOGLE_GENERATIVE_AI_API_KEY` enables direct Gemini calls through
+  `@ai-sdk/google`. This avoids Vercel AI Gateway free-tier limits.
+- `OPENAI_API_KEY` enables direct OpenAI calls through `@ai-sdk/openai`. This is
+  an OpenAI Platform API key, not a ChatGPT subscription login.
+- `AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN` enables Vercel AI Gateway.
+- `FAYE_AI_MODEL` overrides the Gateway model only (`openai/gpt-5.4-mini` by
+  default). It must be a model id like `openai/gpt-5.4-mini`, never an API key.
+- `FAYE_GOOGLE_MODEL` overrides the direct Gemini model (`gemini-2.5-flash` by
+  default).
+- `FAYE_OPENAI_MODEL` overrides the direct OpenAI model (`gpt-4.1-mini` by
+  default).
+- If all configured providers fail, FAYE returns a deterministic local answer for
+  demo inputs and a conservative `needs_input` response for image inputs.
 - If there is no image or demo input, Eve returns `needs_input` instead of
   inventing a residue.
 
@@ -31,3 +42,24 @@ message so the product feels responsive without hallucinating a classification.
 
 This keeps the demo stable while still letting Eve improve the language and
 decision quality when AI is available.
+
+## Recommended Demo Setup
+
+For the hackathon demo, prefer one direct provider key:
+
+```env
+FAYE_AI_PROVIDER=auto
+GOOGLE_GENERATIVE_AI_API_KEY=...
+FAYE_GOOGLE_MODEL=gemini-2.5-flash
+```
+
+OpenAI is also supported:
+
+```env
+FAYE_AI_PROVIDER=auto
+OPENAI_API_KEY=...
+FAYE_OPENAI_MODEL=gpt-4.1-mini
+```
+
+Keep `AI_GATEWAY_API_KEY` as a fallback, but do not rely on Gateway free tier for
+the live image-recognition moment.

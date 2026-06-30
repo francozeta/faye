@@ -1,5 +1,7 @@
 import "server-only"
 
+import { google } from "@ai-sdk/google"
+import { openai } from "@ai-sdk/openai"
 import { generateText } from "ai"
 import { z } from "zod"
 
@@ -16,11 +18,22 @@ import type {
 } from "@/lib/eve/types"
 
 export const DEFAULT_EVE_MODEL = "openai/gpt-5.4-mini"
+const DEFAULT_EVE_GOOGLE_MODEL = "gemini-2.5-flash"
+const DEFAULT_EVE_OPENAI_MODEL = "gpt-4.1-mini"
 const EVE_MODEL_FALLBACKS = [
   "openai/gpt-4o-mini",
   "mistral/pixtral-12b",
   "google/gemini-2.5-flash-lite",
 ] as const
+const EVE_PROVIDER_VALUES = ["auto", "gateway", "google", "openai"] as const
+
+type EveProviderPreference = (typeof EVE_PROVIDER_VALUES)[number]
+type EveModelCandidate = {
+  id: string
+  model: Parameters<typeof generateText>[0]["model"]
+  provider: Exclude<EveProviderPreference, "auto">
+  providerOptions?: Parameters<typeof generateText>[0]["providerOptions"]
+}
 
 export const eveClassificationInputSchema = z.object({
   residueId: z.enum(demoResidueIds).optional(),
@@ -89,14 +102,111 @@ export function getEveModel() {
   return model
 }
 
+export function getEveProviderPreference(): EveProviderPreference {
+  const provider = process.env.FAYE_AI_PROVIDER?.trim().toLowerCase()
+
+  if (
+    provider &&
+    EVE_PROVIDER_VALUES.includes(provider as EveProviderPreference)
+  ) {
+    return provider as EveProviderPreference
+  }
+
+  return "auto"
+}
+
+export function getEveGoogleModel() {
+  return process.env.FAYE_GOOGLE_MODEL?.trim() || DEFAULT_EVE_GOOGLE_MODEL
+}
+
+export function getEveOpenAiModel() {
+  return process.env.FAYE_OPENAI_MODEL?.trim() || DEFAULT_EVE_OPENAI_MODEL
+}
+
 export function getEveModelCandidates() {
-  return [getEveModel(), ...EVE_MODEL_FALLBACKS].filter(
-    (model, index, models) => models.indexOf(model) === index
+  const preference = getEveProviderPreference()
+  const candidates: EveModelCandidate[] = []
+
+  if (
+    (preference === "auto" || preference === "google") &&
+    hasGoogleDirectKey()
+  ) {
+    const model = getEveGoogleModel()
+
+    candidates.push({
+      id: `google/${model}`,
+      model: google(model),
+      provider: "google",
+      providerOptions: {
+        google: {
+          mediaResolution: "MEDIA_RESOLUTION_LOW",
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
+        },
+      },
+    })
+  }
+
+  if (
+    (preference === "auto" || preference === "openai") &&
+    hasOpenAiDirectKey()
+  ) {
+    const model = getEveOpenAiModel()
+
+    candidates.push({
+      id: `openai/${model}`,
+      model: openai(model),
+      provider: "openai",
+      providerOptions: {
+        openai: {
+          store: false,
+        },
+      },
+    })
+  }
+
+  if (preference === "auto" || preference === "gateway") {
+    for (const model of [getEveModel(), ...EVE_MODEL_FALLBACKS]) {
+      if (candidates.some((candidate) => candidate.id === model)) {
+        continue
+      }
+
+      candidates.push({
+        id: model,
+        model,
+        provider: "gateway",
+        providerOptions: {
+          gateway: {
+            tags: ["feature:eve-classifier"],
+          },
+        },
+      })
+    }
+  }
+
+  return candidates.filter(
+    (candidate, index, models) =>
+      models.findIndex((model) => model.id === candidate.id) === index
   )
 }
 
 export function isEveGatewayConfigured() {
   return Boolean(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN)
+}
+
+export function hasGoogleDirectKey() {
+  return Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY)
+}
+
+export function hasOpenAiDirectKey() {
+  return Boolean(process.env.OPENAI_API_KEY)
+}
+
+export function isEveAiConfigured() {
+  return (
+    hasGoogleDirectKey() || hasOpenAiDirectKey() || isEveGatewayConfigured()
+  )
 }
 
 export async function classifyResidueWithEve(
@@ -126,20 +236,22 @@ export async function classifyResidueWithEve(
     )
   }
 
-  if (!isEveGatewayConfigured()) {
+  const candidates = getEveModelCandidates()
+
+  if (!isEveAiConfigured() || candidates.length === 0) {
     return buildFallbackClassification(
       input,
-      "No se encontro AI_GATEWAY_API_KEY ni VERCEL_OIDC_TOKEN."
+      "No se encontro GOOGLE_GENERATIVE_AI_API_KEY, OPENAI_API_KEY, AI_GATEWAY_API_KEY ni VERCEL_OIDC_TOKEN."
     )
   }
 
   const seed = getDemoResidueById(input.residueId)
   let lastError: unknown
 
-  for (const model of getEveModelCandidates()) {
+  for (const candidate of candidates) {
     try {
       const { text } = await generateText({
-        model,
+        model: candidate.model,
         instructions:
           "Eres Eve, la capa inteligente invisible de FAYE. Clasificas residuos domesticos para convertir duda en accion. Responde siempre en espanol claro, breve y accionable. No eres un chatbot generico: tu trabajo es dar una decision, una preparacion concreta, impacto simple y una senal de habito. No inventes reglas municipales ni precision falsa; cuando haya incertidumbre, usa lenguaje probable. Devuelve exclusivamente un objeto JSON valido, sin markdown, sin explicacion fuera del JSON.",
         maxRetries: 0,
@@ -149,11 +261,7 @@ export async function classifyResidueWithEve(
             content: buildUserContent(input, seed, inputMode),
           },
         ],
-        providerOptions: {
-          gateway: {
-            tags: ["feature:eve-classifier", `mode:${inputMode}`],
-          },
-        },
+        providerOptions: withModeTag(candidate.providerOptions, inputMode),
       })
       const output = parseEveOutput(text)
 
@@ -162,7 +270,7 @@ export async function classifyResidueWithEve(
           ...output,
           analyzedAt: new Date().toISOString(),
           source: "ai",
-          model,
+          model: candidate.id,
         }
       }
 
@@ -172,13 +280,13 @@ export async function classifyResidueWithEve(
         points: Math.round(output.points),
         analyzedAt: new Date().toISOString(),
         source: "ai",
-        model,
+        model: candidate.id,
       }
     } catch (error) {
       lastError = error
       console.warn(
         "[eve] AI model attempt failed",
-        model,
+        candidate.id,
         getSafeErrorLabel(error)
       )
     }
@@ -222,6 +330,23 @@ function extractJsonObject(rawText: string) {
   }
 
   return trimmed.slice(start, end + 1)
+}
+
+function withModeTag(
+  providerOptions: EveModelCandidate["providerOptions"],
+  inputMode: EveInputMode
+) {
+  if (!providerOptions?.gateway) {
+    return providerOptions
+  }
+
+  return {
+    ...providerOptions,
+    gateway: {
+      ...providerOptions.gateway,
+      tags: ["feature:eve-classifier", `mode:${inputMode}`],
+    },
+  }
 }
 
 function buildUserContent(
