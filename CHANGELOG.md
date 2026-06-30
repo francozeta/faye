@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.1.2](https://github.com/francozeta/faye/compare/v0.1.1...v0.1.2) (2026-06-30)
+
+
+### Features
+
+* add anonymous habit recording ([4565647](https://github.com/francozeta/faye/commit/45656479ed66bcebcdad4ded89b6fd07e223177e))
+* add vision-aware Eve scan flow ([e3f6c4d](https://github.com/francozeta/faye/commit/e3f6c4d74e5cf2b05b719531259b14c938671fa0))
+* **ai:** add eve classification adapter ([af5683b](https://github.com/francozeta/faye/commit/af5683b1d369246e0fe2fb81403e0f8225b6c2be))
+* **ai:** add Eve classification adapter ([f1e2c6b](https://github.com/francozeta/faye/commit/f1e2c6b1f12cf92a619154b658542984d0565a1f))
+* gate habit persistence with email auth ([ba461f3](https://github.com/francozeta/faye/commit/ba461f317d0b1e4ed6013745090ee90080ad33f0))
+* refine scan and result workspace ([524ff40](https://github.com/francozeta/faye/commit/524ff40717b7bd2152ab64cc5cbf38debdf4000d))
+* support direct Eve vision providers ([8a9647b](https://github.com/francozeta/faye/commit/8a9647b3b9d209db1446f5e67e3afd7ee04edd53))
+* **web:** add vision-aware Eve scan flow ([3f9760a](https://github.com/francozeta/faye/commit/3f9760a68dad4df5de2cb19f3f50154b08217853))
+* **web:** finish product demo flow ([0e34dee](https://github.com/francozeta/faye/commit/0e34dee917f8ca2c6c4a41214e0569b00a8f3e5d))
+
+
+### Bug Fixes
+
+* **ai:** handle empty scan input ([f810033](https://github.com/francozeta/faye/commit/f81003351305f3918345c48a7ad4fcbaa012ed32))
+* normalize Eve vision output ([74f2f4f](https://github.com/francozeta/faye/commit/74f2f4f09bee04a347adfc2ef3e4f9583f74f6c8))
+
 ## [0.1.1](https://github.com/francozeta/faye/compare/v0.1.0...v0.1.1) (2026-06-28)
 
 
