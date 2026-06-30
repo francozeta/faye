@@ -69,3 +69,14 @@ Before the June 30 demo, releases are useful as milestones:
 - `v0.2.0`: primary demo loop.
 - `v0.3.0`: AI and persistence polish.
 - `v1.0.0-demo`: final demo candidate, only if the app is stable.
+
+## Contributor AI Skill Lock
+
+`skills-lock.json` is the shared reference for the AI-agent skills recommended on this project. It currently covers:
+
+- AI product work: `ai-sdk`, `ai-elements`, and `eve`.
+- Interface work: `shadcn` and `make-interfaces-feel-better`.
+- Backend and database work: `supabase` and `supabase-postgres-best-practices`.
+- Automation work: `github-actions-docs`.
+
+Keep this file versioned when the team changes the expected AI-agent setup. Do not store API keys, tokens, prompts with secrets, or local machine paths in it.

@@ -25,6 +25,12 @@ Primary loop:
 - Supabase for persistence when it strengthens the demo.
 - Vercel AI Gateway through `AI_GATEWAY_API_KEY` when the AI layer is added.
 
+## Contributor AI Skills
+
+This repository includes `skills-lock.json` as the recommended AI-agent skill set for contributors working on FAYE. It documents the skill sources and hashes used for product, UI, Supabase, GitHub Actions, and AI SDK work.
+
+The app does not require these skills to run. They are a contributor setup aid so new contributors can reproduce the same working context when planning or implementing features.
+
 ## Local Development
 
 Run the development server:
