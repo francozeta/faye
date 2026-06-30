@@ -1,6 +1,7 @@
 create table if not exists public.habit_events (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
+  user_id uuid references auth.users(id) on delete set null default auth.uid(),
   device_id text not null check (char_length(device_id) between 8 and 96),
   residue_id text not null,
   residue_name text not null,
@@ -18,15 +19,30 @@ create table if not exists public.habit_events (
 alter table public.habit_events enable row level security;
 
 drop policy if exists "anon can insert habit events" on public.habit_events;
+drop policy if exists "authenticated can insert own habit events" on public.habit_events;
+drop policy if exists "authenticated can read own habit events" on public.habit_events;
 
 create policy "anon can insert habit events"
 on public.habit_events
 for insert
 to anon
-with check (true);
+with check (user_id is null);
+
+create policy "authenticated can insert own habit events"
+on public.habit_events
+for insert
+to authenticated
+with check ((select auth.uid()) = user_id);
+
+create policy "authenticated can read own habit events"
+on public.habit_events
+for select
+to authenticated
+using ((select auth.uid()) = user_id);
 
 grant usage on schema public to anon;
 grant insert on table public.habit_events to anon;
+grant insert, select on table public.habit_events to authenticated;
 
 create index if not exists habit_events_device_created_at_idx
 on public.habit_events (device_id, created_at desc);

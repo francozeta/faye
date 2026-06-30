@@ -20,6 +20,14 @@ import { FayeLogo } from "@/components/faye-logo"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
+import {
   Marker,
   MarkerContent,
   MarkerIcon,
@@ -36,10 +44,19 @@ import type {
   EveInputMode,
   ResidueDecision,
 } from "@/lib/eve/types"
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser"
 import { cn } from "@/lib/utils"
 
 type FayeView = "scan" | "result" | "habit" | "demo"
 type Phase = "ready" | "analyzing" | "recording" | "logged"
+type AuthStatus =
+  | "authenticated"
+  | "checking"
+  | "error"
+  | "guest"
+  | "sending"
+  | "sent"
+  | "unavailable"
 type UploadPreview = {
   dataUrl: string
   mediaType: string
@@ -56,6 +73,26 @@ type StoredHabit = {
   streak: number
   synced?: boolean
 }
+type HabitEventPayload = {
+  deviceId: string
+  residue: {
+    bin: string
+    category: string
+    confidence: number
+    id: string
+    impact?: string
+    material: string
+    name: string
+    points: number
+    preparation?: string
+    source?: string
+  }
+}
+type HabitAuthState = {
+  email: string
+  message: string | null
+  status: AuthStatus
+}
 
 const emptyHabit: StoredHabit = {
   count: 0,
@@ -64,6 +101,8 @@ const emptyHabit: StoredHabit = {
   streak: 0,
   synced: false,
 }
+
+const lastHabitEventStorageKey = "faye:last-habit-event"
 
 const scenarioIcons = {
   "pet-bottle": Recycle01Icon,
@@ -154,6 +193,28 @@ function getOrCreateDeviceId() {
   return nextId
 }
 
+async function postHabitEvent(
+  payload: HabitEventPayload,
+  accessToken?: string | null
+) {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  }
+
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`
+  }
+
+  const response = await fetch("/api/habit/events", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  })
+  const result = (await response.json()) as { persisted?: boolean }
+
+  return response.ok && Boolean(result.persisted)
+}
+
 function residueKind(residue: DisplayResidue) {
   return residue.category || residue.material || residue.shortName
 }
@@ -206,6 +267,23 @@ export function FayeFlow({
     React.useState<UploadPreview | null>(null)
   const [analysisResult, setAnalysisResult] =
     React.useState<EveAnalysisResult | null>(null)
+  const supabase = React.useMemo(() => createBrowserSupabaseClient(), [])
+  const [authAccessToken, setAuthAccessToken] = React.useState<string | null>(
+    null
+  )
+  const [authState, setAuthState] = React.useState<HabitAuthState>(() =>
+    supabase
+      ? {
+          email: "",
+          message: null,
+          status: "checking",
+        }
+      : {
+          email: "",
+          message: "Supabase Auth no esta configurado.",
+          status: "unavailable",
+        }
+  )
 
   const activeResidue =
     analysisResult?.status === "classified" ? analysisResult : null
@@ -219,6 +297,85 @@ export function FayeFlow({
   const canGoForward =
     Boolean(activeResidue) &&
     (view === "scan" || (view === "result" && isLogged))
+
+  React.useEffect(() => {
+    if (!supabase) {
+      return
+    }
+
+    let mounted = true
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) {
+        return
+      }
+
+      const session = data.session
+
+      setAuthAccessToken(session?.access_token ?? null)
+      setAuthState({
+        email: session?.user.email ?? "",
+        message: null,
+        status: session ? "authenticated" : "guest",
+      })
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthAccessToken(session?.access_token ?? null)
+      setAuthState({
+        email: session?.user.email ?? "",
+        message: null,
+        status: session ? "authenticated" : "guest",
+      })
+    })
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [supabase])
+
+  React.useEffect(() => {
+    if (
+      authState.status !== "authenticated" ||
+      !authAccessToken ||
+      habit.synced
+    ) {
+      return
+    }
+
+    const storedEvent = window.sessionStorage.getItem(lastHabitEventStorageKey)
+
+    if (!storedEvent) {
+      return
+    }
+
+    let payload: HabitEventPayload
+
+    try {
+      payload = JSON.parse(storedEvent) as HabitEventPayload
+    } catch {
+      window.sessionStorage.removeItem(lastHabitEventStorageKey)
+      return
+    }
+
+    void postHabitEvent(payload, authAccessToken).then((synced) => {
+      if (!synced) {
+        return
+      }
+
+      const nextHabit = {
+        ...habit,
+        lastSyncedAt: new Date().toISOString(),
+        synced: true,
+      }
+
+      setHabit(nextHabit)
+      window.sessionStorage.setItem("faye:habit", JSON.stringify(nextHabit))
+    })
+  }, [authAccessToken, authState.status, habit])
 
   React.useEffect(() => {
     if (view === "scan") {
@@ -359,33 +516,25 @@ export function FayeFlow({
       progress: Math.min(100, habit.progress + 16),
       streak: Math.max(1, habit.streak),
     }
+    const eventPayload: HabitEventPayload = {
+      deviceId: getOrCreateDeviceId(),
+      residue: {
+        id: activeResidue.id,
+        name: activeResidue.name,
+        material: activeResidue.material,
+        category: activeResidue.category,
+        bin: activeResidue.bin,
+        points: activeResidue.points,
+        confidence: activeResidue.confidence,
+        preparation: activeResidue.preparation,
+        impact: activeResidue.impact,
+        source: activeResidue.source,
+      },
+    }
     let synced = false
 
     try {
-      const response = await fetch("/api/habit/events", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          deviceId: getOrCreateDeviceId(),
-          residue: {
-            id: activeResidue.id,
-            name: activeResidue.name,
-            material: activeResidue.material,
-            category: activeResidue.category,
-            bin: activeResidue.bin,
-            points: activeResidue.points,
-            confidence: activeResidue.confidence,
-            preparation: activeResidue.preparation,
-            impact: activeResidue.impact,
-            source: activeResidue.source,
-          },
-        }),
-      })
-      const result = (await response.json()) as { persisted?: boolean }
-
-      synced = response.ok && Boolean(result.persisted)
+      synced = await postHabitEvent(eventPayload, authAccessToken)
     } catch {
       synced = false
     }
@@ -399,10 +548,56 @@ export function FayeFlow({
     setPhase("logged")
     setHabit(storedHabit)
     window.sessionStorage.setItem("faye:habit", JSON.stringify(storedHabit))
+    window.sessionStorage.setItem(
+      lastHabitEventStorageKey,
+      JSON.stringify(eventPayload)
+    )
 
     if (view !== "demo") {
       router.push("/habit")
     }
+  }
+
+  async function requestHabitAuth(email: string) {
+    const normalizedEmail = email.trim().toLowerCase()
+
+    if (!supabase) {
+      setAuthState({
+        email: normalizedEmail,
+        message: "Activa Supabase Auth para guardar el progreso.",
+        status: "unavailable",
+      })
+      return
+    }
+
+    setAuthState({
+      email: normalizedEmail,
+      message: null,
+      status: "sending",
+    })
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: normalizedEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/habit`,
+        shouldCreateUser: true,
+      },
+    })
+
+    if (error) {
+      setAuthState({
+        email: normalizedEmail,
+        message: "No pude enviar el enlace. Intenta con otro correo.",
+        status: "error",
+      })
+      return
+    }
+
+    setAuthState({
+      email: normalizedEmail,
+      message: "Te enviamos un enlace para guardar tu progreso.",
+      status: "sent",
+    })
   }
 
   function goToPreviousStep() {
@@ -437,6 +632,7 @@ export function FayeFlow({
     <main className="h-dvh overflow-hidden bg-background text-foreground">
       <div className="grid h-full grid-rows-[48px_minmax(0,1fr)] overflow-hidden sm:grid-rows-[52px_minmax(0,1fr)]">
         <FayeTopBar
+          authState={authState}
           view={view}
         />
 
@@ -477,6 +673,8 @@ export function FayeFlow({
                         selectedResidue={activeResidue}
                         phase={phase}
                         habit={habit}
+                        authState={authState}
+                        onSaveWithEmail={requestHabitAuth}
                         compact
                       />
                     </div>
@@ -500,6 +698,8 @@ export function FayeFlow({
                       selectedResidue={activeResidue}
                       phase="logged"
                       habit={habit}
+                      authState={authState}
+                      onSaveWithEmail={requestHabitAuth}
                     />
                     <div className="hidden min-h-0 lg:block">
                       <ResultSummary selectedResidue={activeResidue} />
@@ -543,6 +743,8 @@ export function FayeFlow({
                         selectedResidue={activeResidue}
                         phase={phase}
                         habit={habit}
+                        authState={authState}
+                        onSaveWithEmail={requestHabitAuth}
                         compact
                       />
                     </div>
@@ -565,12 +767,16 @@ export function FayeFlow({
 }
 
 function FayeTopBar({
+  authState,
   view,
 }: {
+  authState: HabitAuthState
   view: FayeView
 }) {
   const viewLabel =
     view === "result" ? "Result" : view === "habit" ? "Habit" : "Scan"
+  const accountLabel =
+    authState.status === "authenticated" ? "Cuenta" : "Invitado"
 
   return (
     <header className="grid h-12 grid-cols-[1fr_auto_1fr] items-center px-2 sm:h-13 sm:px-3">
@@ -588,7 +794,9 @@ function FayeTopBar({
       </div>
 
       <div className="flex min-w-0 items-center justify-end gap-1.5">
-        <Badge variant="outline">Invitado</Badge>
+        <Badge variant={authState.status === "authenticated" ? "secondary" : "outline"}>
+          {accountLabel}
+        </Badge>
       </div>
     </header>
   )
@@ -789,14 +997,18 @@ function ResultPanel({
 }
 
 function HabitPanel({
+  authState,
   selectedResidue,
   phase,
   habit,
+  onSaveWithEmail,
   compact = false,
 }: {
+  authState: HabitAuthState
   selectedResidue: DisplayResidue
   phase: Phase
   habit: StoredHabit
+  onSaveWithEmail: (email: string) => void | Promise<void>
   compact?: boolean
 }) {
   const isLogged = phase === "logged" || habit.count > 0
@@ -847,6 +1059,13 @@ function HabitPanel({
           </p>
         </div>
 
+        {!compact && habit.count > 0 ? (
+          <HabitAuthPanel
+            authState={authState}
+            onSaveWithEmail={onSaveWithEmail}
+          />
+        ) : null}
+
         {!compact ? (
           <div className="hidden grid-cols-3 gap-2 sm:grid">
             <ImpactRow label="Recuperados" value={`${habit.count}`} />
@@ -859,6 +1078,83 @@ function HabitPanel({
         ) : null}
       </div>
     </section>
+  )
+}
+
+function HabitAuthPanel({
+  authState,
+  onSaveWithEmail,
+}: {
+  authState: HabitAuthState
+  onSaveWithEmail: (email: string) => void | Promise<void>
+}) {
+  const [email, setEmail] = React.useState(authState.email)
+  const isAuthenticated = authState.status === "authenticated"
+  const isSending = authState.status === "sending"
+  const isSent = authState.status === "sent"
+  const hasError = authState.status === "error"
+
+  if (isAuthenticated) {
+    return (
+      <div className="rounded-md border border-border bg-background/40 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs font-medium">Progreso vinculado</p>
+          <Badge variant="secondary">Cuenta</Badge>
+        </div>
+        <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
+          {authState.email || "Tu correo"} conservara los registros de habito.
+        </p>
+      </div>
+    )
+  }
+
+  if (isSent) {
+    return (
+      <div className="rounded-md border border-border bg-background/40 p-3">
+        <p className="text-xs font-medium">Revisa tu correo</p>
+        <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
+          {authState.message ?? "Enlace enviado."}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <form
+      className="rounded-md border border-border bg-background/40 p-3"
+      onSubmit={(event) => {
+        event.preventDefault()
+        void onSaveWithEmail(email)
+      }}
+    >
+      <FieldGroup className="gap-2">
+        <Field data-invalid={hasError || undefined}>
+          <FieldLabel htmlFor="habit-email">Guardar progreso</FieldLabel>
+          <FieldDescription>
+            Enviaremos un enlace para asociar este habito a tu correo.
+          </FieldDescription>
+          <div className="flex gap-2">
+            <Input
+              aria-invalid={hasError || undefined}
+              autoComplete="email"
+              disabled={isSending}
+              id="habit-email"
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="tu@email.com"
+              required
+              type="email"
+              value={email}
+            />
+            <Button disabled={isSending} type="submit">
+              {isSending ? "Enviando" : "Guardar"}
+            </Button>
+          </div>
+          {hasError && authState.message ? (
+            <FieldError>{authState.message}</FieldError>
+          ) : null}
+        </Field>
+      </FieldGroup>
+    </form>
   )
 }
 
