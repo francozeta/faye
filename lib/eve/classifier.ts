@@ -1,5 +1,7 @@
 import "server-only"
 
+import { google } from "@ai-sdk/google"
+import { openai } from "@ai-sdk/openai"
 import { generateText } from "ai"
 import { z } from "zod"
 
@@ -16,11 +18,22 @@ import type {
 } from "@/lib/eve/types"
 
 export const DEFAULT_EVE_MODEL = "openai/gpt-5.4-mini"
+const DEFAULT_EVE_GOOGLE_MODEL = "gemini-2.5-flash"
+const DEFAULT_EVE_OPENAI_MODEL = "gpt-4.1-mini"
 const EVE_MODEL_FALLBACKS = [
   "openai/gpt-4o-mini",
   "mistral/pixtral-12b",
   "google/gemini-2.5-flash-lite",
 ] as const
+const EVE_PROVIDER_VALUES = ["auto", "gateway", "google", "openai"] as const
+
+type EveProviderPreference = (typeof EVE_PROVIDER_VALUES)[number]
+type EveModelCandidate = {
+  id: string
+  model: Parameters<typeof generateText>[0]["model"]
+  provider: Exclude<EveProviderPreference, "auto">
+  providerOptions?: Parameters<typeof generateText>[0]["providerOptions"]
+}
 
 export const eveClassificationInputSchema = z.object({
   residueId: z.enum(demoResidueIds).optional(),
@@ -75,6 +88,45 @@ const eveAnalysisOutputSchema = z.discriminatedUnion("status", [
   eveNeedsInputOutputSchema,
 ])
 
+const rawEveClassificationOutputSchema = z
+  .object({
+    status: z.literal("classified"),
+    id: z.unknown().optional(),
+    name: z.unknown().optional(),
+    shortName: z.unknown().optional(),
+    material: z.unknown().optional(),
+    category: z.unknown().optional(),
+    bin: z.unknown().optional(),
+    confidence: z.unknown().optional(),
+    preparation: z.unknown().optional(),
+    rationale: z.unknown().optional(),
+    habit: z.unknown().optional(),
+    impact: z.unknown().optional(),
+    reward: z.unknown().optional(),
+    points: z.unknown().optional(),
+    visual: z
+      .object({
+        label: z.unknown().optional(),
+        detail: z.unknown().optional(),
+      })
+      .optional(),
+  })
+  .passthrough()
+
+const rawEveNeedsInputOutputSchema = z
+  .object({
+    status: z.literal("needs_input"),
+    title: z.unknown().optional(),
+    message: z.unknown().optional(),
+    actionLabel: z.unknown().optional(),
+  })
+  .passthrough()
+
+const rawEveAnalysisOutputSchema = z.discriminatedUnion("status", [
+  rawEveClassificationOutputSchema,
+  rawEveNeedsInputOutputSchema,
+])
+
 export type ParsedEveClassificationInput = z.infer<
   typeof eveClassificationInputSchema
 >
@@ -89,14 +141,111 @@ export function getEveModel() {
   return model
 }
 
+export function getEveProviderPreference(): EveProviderPreference {
+  const provider = process.env.FAYE_AI_PROVIDER?.trim().toLowerCase()
+
+  if (
+    provider &&
+    EVE_PROVIDER_VALUES.includes(provider as EveProviderPreference)
+  ) {
+    return provider as EveProviderPreference
+  }
+
+  return "auto"
+}
+
+export function getEveGoogleModel() {
+  return process.env.FAYE_GOOGLE_MODEL?.trim() || DEFAULT_EVE_GOOGLE_MODEL
+}
+
+export function getEveOpenAiModel() {
+  return process.env.FAYE_OPENAI_MODEL?.trim() || DEFAULT_EVE_OPENAI_MODEL
+}
+
 export function getEveModelCandidates() {
-  return [getEveModel(), ...EVE_MODEL_FALLBACKS].filter(
-    (model, index, models) => models.indexOf(model) === index
+  const preference = getEveProviderPreference()
+  const candidates: EveModelCandidate[] = []
+
+  if (
+    (preference === "auto" || preference === "google") &&
+    hasGoogleDirectKey()
+  ) {
+    const model = getEveGoogleModel()
+
+    candidates.push({
+      id: `google/${model}`,
+      model: google(model),
+      provider: "google",
+      providerOptions: {
+        google: {
+          mediaResolution: "MEDIA_RESOLUTION_LOW",
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
+        },
+      },
+    })
+  }
+
+  if (
+    (preference === "auto" || preference === "openai") &&
+    hasOpenAiDirectKey()
+  ) {
+    const model = getEveOpenAiModel()
+
+    candidates.push({
+      id: `openai/${model}`,
+      model: openai(model),
+      provider: "openai",
+      providerOptions: {
+        openai: {
+          store: false,
+        },
+      },
+    })
+  }
+
+  if (preference === "auto" || preference === "gateway") {
+    for (const model of [getEveModel(), ...EVE_MODEL_FALLBACKS]) {
+      if (candidates.some((candidate) => candidate.id === model)) {
+        continue
+      }
+
+      candidates.push({
+        id: model,
+        model,
+        provider: "gateway",
+        providerOptions: {
+          gateway: {
+            tags: ["feature:eve-classifier"],
+          },
+        },
+      })
+    }
+  }
+
+  return candidates.filter(
+    (candidate, index, models) =>
+      models.findIndex((model) => model.id === candidate.id) === index
   )
 }
 
 export function isEveGatewayConfigured() {
   return Boolean(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN)
+}
+
+export function hasGoogleDirectKey() {
+  return Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY)
+}
+
+export function hasOpenAiDirectKey() {
+  return Boolean(process.env.OPENAI_API_KEY)
+}
+
+export function isEveAiConfigured() {
+  return (
+    hasGoogleDirectKey() || hasOpenAiDirectKey() || isEveGatewayConfigured()
+  )
 }
 
 export async function classifyResidueWithEve(
@@ -126,20 +275,22 @@ export async function classifyResidueWithEve(
     )
   }
 
-  if (!isEveGatewayConfigured()) {
+  const candidates = getEveModelCandidates()
+
+  if (!isEveAiConfigured() || candidates.length === 0) {
     return buildFallbackClassification(
       input,
-      "No se encontro AI_GATEWAY_API_KEY ni VERCEL_OIDC_TOKEN."
+      "No se encontro GOOGLE_GENERATIVE_AI_API_KEY, OPENAI_API_KEY, AI_GATEWAY_API_KEY ni VERCEL_OIDC_TOKEN."
     )
   }
 
   const seed = getDemoResidueById(input.residueId)
   let lastError: unknown
 
-  for (const model of getEveModelCandidates()) {
+  for (const candidate of candidates) {
     try {
       const { text } = await generateText({
-        model,
+        model: candidate.model,
         instructions:
           "Eres Eve, la capa inteligente invisible de FAYE. Clasificas residuos domesticos para convertir duda en accion. Responde siempre en espanol claro, breve y accionable. No eres un chatbot generico: tu trabajo es dar una decision, una preparacion concreta, impacto simple y una senal de habito. No inventes reglas municipales ni precision falsa; cuando haya incertidumbre, usa lenguaje probable. Devuelve exclusivamente un objeto JSON valido, sin markdown, sin explicacion fuera del JSON.",
         maxRetries: 0,
@@ -149,20 +300,16 @@ export async function classifyResidueWithEve(
             content: buildUserContent(input, seed, inputMode),
           },
         ],
-        providerOptions: {
-          gateway: {
-            tags: ["feature:eve-classifier", `mode:${inputMode}`],
-          },
-        },
+        providerOptions: withModeTag(candidate.providerOptions, inputMode),
       })
-      const output = parseEveOutput(text)
+      const output = parseEveOutput(text, seed)
 
       if (output.status === "needs_input") {
         return {
           ...output,
           analyzedAt: new Date().toISOString(),
           source: "ai",
-          model,
+          model: candidate.id,
         }
       }
 
@@ -172,13 +319,13 @@ export async function classifyResidueWithEve(
         points: Math.round(output.points),
         analyzedAt: new Date().toISOString(),
         source: "ai",
-        model,
+        model: candidate.id,
       }
     } catch (error) {
       lastError = error
       console.warn(
         "[eve] AI model attempt failed",
-        model,
+        candidate.id,
         getSafeErrorLabel(error)
       )
     }
@@ -189,7 +336,7 @@ export async function classifyResidueWithEve(
   if (inputMode === "image") {
     return buildEmptyInputResponse({
       fallbackReason:
-        "Gateway no pudo completar vision; Eve evito inventar una clasificacion.",
+        "Los proveedores de IA no pudieron completar vision; Eve evito inventar una clasificacion.",
       message:
         "No pude analizar esa imagen con suficiente confianza. Intenta otra foto con el residuo centrado y buena luz.",
       title: "No pude confirmar el residuo",
@@ -202,10 +349,57 @@ export async function classifyResidueWithEve(
   )
 }
 
-function parseEveOutput(rawText: string) {
+function parseEveOutput(
+  rawText: string,
+  seed: ReturnType<typeof getDemoResidueById>
+) {
   const parsedJson = JSON.parse(extractJsonObject(rawText)) as unknown
+  const rawOutput = rawEveAnalysisOutputSchema.parse(parsedJson)
 
-  return eveAnalysisOutputSchema.parse(parsedJson)
+  if (rawOutput.status === "needs_input") {
+    return eveAnalysisOutputSchema.parse({
+      status: "needs_input",
+      title: cleanText(rawOutput.title, "No veo un residuo claro", 80),
+      message: cleanText(
+        rawOutput.message,
+        "Sube otra foto donde el residuo este centrado y visible.",
+        180
+      ),
+      actionLabel: cleanText(rawOutput.actionLabel, "Agrega una imagen", 40),
+    })
+  }
+
+  const name = cleanText(rawOutput.name, seed.name, 80)
+  const shortName = cleanText(rawOutput.shortName, name, 32)
+  const material = cleanText(rawOutput.material, seed.material, 48)
+  const category = cleanText(rawOutput.category, seed.category, 56)
+  const bin = cleanText(rawOutput.bin, seed.bin, 64)
+  const points = toBoundedInteger(rawOutput.points, seed.points, 0, 30)
+
+  return eveAnalysisOutputSchema.parse({
+    status: "classified",
+    id: cleanKebabId(rawOutput.id, shortName),
+    name,
+    shortName,
+    material,
+    category,
+    bin,
+    confidence: toBoundedInteger(rawOutput.confidence, seed.confidence, 0, 100),
+    preparation: cleanText(rawOutput.preparation, seed.preparation, 180),
+    rationale: cleanText(rawOutput.rationale, seed.rationale, 240),
+    habit: cleanText(rawOutput.habit, seed.habit, 140),
+    impact: cleanText(rawOutput.impact, seed.impact, 140),
+    reward: cleanText(rawOutput.reward, `+${points} puntos de habito`, 40),
+    points,
+    visual: {
+      label: cleanVisualLabel(
+        rawOutput.visual?.label,
+        `${material} ${name} ${category}`,
+        seed.visual.label
+      ),
+      detail: cleanText(rawOutput.visual?.detail, material, 24),
+    },
+  })
 }
 
 function extractJsonObject(rawText: string) {
@@ -222,6 +416,85 @@ function extractJsonObject(rawText: string) {
   }
 
   return trimmed.slice(start, end + 1)
+}
+
+function withModeTag(
+  providerOptions: EveModelCandidate["providerOptions"],
+  inputMode: EveInputMode
+) {
+  if (!providerOptions?.gateway) {
+    return providerOptions
+  }
+
+  return {
+    ...providerOptions,
+    gateway: {
+      ...providerOptions.gateway,
+      tags: ["feature:eve-classifier", `mode:${inputMode}`],
+    },
+  }
+}
+
+function cleanText(value: unknown, fallback: string, maxLength: number) {
+  const text = typeof value === "string" ? value.trim() : ""
+  const safeText = text || fallback
+
+  return safeText.length > maxLength ? safeText.slice(0, maxLength).trim() : safeText
+}
+
+function cleanKebabId(value: unknown, fallback: string) {
+  const text = cleanText(value, fallback, 48)
+  const id = text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+
+  return id || "residuo-domestico"
+}
+
+function cleanVisualLabel(value: unknown, context: string, fallback: string) {
+  const text = typeof value === "string" ? value.trim() : ""
+
+  if (text && text.length <= 12) {
+    return text
+  }
+
+  const normalized = `${text} ${context}`
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+
+  if (normalized.includes("pet")) return "PET"
+  if (normalized.includes("plast")) return "PLA"
+  if (normalized.includes("vidrio")) return "VID"
+  if (normalized.includes("metal") || normalized.includes("lata")) return "MET"
+  if (normalized.includes("carton")) return "CAR"
+  if (normalized.includes("papel")) return "PAP"
+  if (normalized.includes("organic")) return "ORG"
+
+  return cleanText(fallback, "RES", 12)
+}
+
+function toBoundedInteger(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number
+) {
+  const numericValue =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseFloat(value)
+        : Number.NaN
+
+  if (!Number.isFinite(numericValue)) {
+    return fallback
+  }
+
+  return Math.min(max, Math.max(min, Math.round(numericValue)))
 }
 
 function buildUserContent(

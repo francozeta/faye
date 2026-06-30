@@ -1,5 +1,0 @@
-import { FayeFlow } from "@/components/faye-flow"
-
-export function FayeDemo() {
-  return <FayeFlow view="demo" />
-}
