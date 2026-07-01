@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.3](https://github.com/francozeta/faye/compare/v0.1.2...v0.1.3) (2026-07-01)
+
+
+### Features
+
+* **ai:** add normalized waste decision catalog ([246e99d](https://github.com/francozeta/faye/commit/246e99d484fe95933dae9ee237eaaffe0d070ce4))
+* **ai:** add normalized waste decision catalog ([0d0b8aa](https://github.com/francozeta/faye/commit/0d0b8aa648be8c2586b9e82e4826d94791fab601))
+
 ## [0.1.2](https://github.com/francozeta/faye/compare/v0.1.1...v0.1.2) (2026-06-30)
 
 
