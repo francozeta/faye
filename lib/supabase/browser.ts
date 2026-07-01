@@ -1,3 +1,4 @@
+import type { Database } from "@/database.types"
 import { createClient } from "@supabase/supabase-js"
 
 export function createBrowserSupabaseClient() {
@@ -8,7 +9,7 @@ export function createBrowserSupabaseClient() {
     return null
   }
 
-  return createClient(url, key, {
+  return createClient<Database>(url, key, {
     auth: {
       autoRefreshToken: true,
       detectSessionInUrl: true,
