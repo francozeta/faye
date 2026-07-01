@@ -30,6 +30,7 @@ residue, explain the next action, and convert it into habit progress.
 The adapter returns the same shape used by the UI:
 
 - residue identity
+- normalized `residueTypeId` when the decision matches the waste catalog
 - category and destination
 - confidence
 - recommended preparation
@@ -42,6 +43,35 @@ message so the product feels responsive without hallucinating a classification.
 
 This keeps the demo stable while still letting Eve improve the language and
 decision quality when AI is available.
+
+## Waste Decision Layer
+
+`lib/waste-catalog.ts` is the current product source of truth for household
+waste decisions. It defines common residue types, aliases, destinations,
+preparation steps, habit rewards, impact copy, and whether the rule is national,
+district-specific, or uncertain.
+
+The first catalog slice covers:
+
+- PET bottle
+- aluminum can
+- cardboard box
+- glass bottle
+- organic scraps
+- thermal receipt
+- beverage carton
+- dirty flexible plastic
+- used battery
+
+Eve can suggest a `residueTypeId`, but the server normalizes the final product
+response against the catalog. When a visual answer does not match any known
+type, FAYE caps confidence and marks the decision as
+`uncertain-household-waste` instead of inventing a new disposal category.
+
+Habit events include the normalized decision metadata in `metadata`, including
+`residue_type_id`, `destination`, `rule_scope`, and `normalized`. This keeps the
+current table stable while leaving a clear path to future Supabase tables for
+residue types, local rules, and district-specific drop-off points.
 
 ## Recommended Demo Setup
 

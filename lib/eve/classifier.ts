@@ -16,6 +16,14 @@ import type {
   EveClassificationInput,
   EveInputMode,
 } from "@/lib/eve/types"
+import {
+  buildWasteCatalogPromptSummary,
+  getUncertainWasteDecision,
+  normalizeWasteDecision,
+  wasteDestinations,
+  wasteResidueTypeIds,
+  wasteRuleScopes,
+} from "@/lib/waste-catalog"
 
 export const DEFAULT_EVE_MODEL = "openai/gpt-5.4-mini"
 const DEFAULT_EVE_GOOGLE_MODEL = "gemini-2.5-flash"
@@ -58,12 +66,16 @@ export const eveClassificationInputSchema = z.object({
 const eveClassificationOutputSchema = z.object({
   status: z.literal("classified"),
   id: z.string().trim().min(1).max(48),
+  residueTypeId: z.enum(wasteResidueTypeIds),
+  normalized: z.boolean(),
   name: z.string().trim().min(1).max(80),
   shortName: z.string().trim().min(1).max(32),
   material: z.string().trim().min(1).max(48),
   category: z.string().trim().min(1).max(56),
   bin: z.string().trim().min(1).max(64),
   confidence: z.number().min(0).max(100),
+  destination: z.enum(wasteDestinations),
+  ruleScope: z.enum(wasteRuleScopes),
   preparation: z.string().trim().min(1).max(180),
   rationale: z.string().trim().min(1).max(240),
   habit: z.string().trim().min(1).max(140),
@@ -92,6 +104,7 @@ const rawEveClassificationOutputSchema = z
   .object({
     status: z.literal("classified"),
     id: z.unknown().optional(),
+    residueTypeId: z.unknown().optional(),
     name: z.unknown().optional(),
     shortName: z.unknown().optional(),
     material: z.unknown().optional(),
@@ -278,6 +291,16 @@ export async function classifyResidueWithEve(
   const candidates = getEveModelCandidates()
 
   if (!isEveAiConfigured() || candidates.length === 0) {
+    if (inputMode === "image") {
+      return buildEmptyInputResponse({
+        fallbackReason:
+          "No hay proveedor de IA configurado; Eve evito usar una clasificacion demo para una imagen real.",
+        message:
+          "No puedo confirmar esta imagen sin la capa visual activa. Prueba un escenario demo o configura un proveedor de IA.",
+        title: "Vision no configurada",
+      })
+    }
+
     return buildFallbackClassification(
       input,
       "No se encontro GOOGLE_GENERATIVE_AI_API_KEY, OPENAI_API_KEY, AI_GATEWAY_API_KEY ni VERCEL_OIDC_TOKEN."
@@ -302,7 +325,10 @@ export async function classifyResidueWithEve(
         ],
         providerOptions: withModeTag(candidate.providerOptions, inputMode),
       })
-      const output = parseEveOutput(text, seed)
+      const output = parseEveOutput(
+        text,
+        inputMode === "demo" ? seed : null
+      )
 
       if (output.status === "needs_input") {
         return {
@@ -351,10 +377,11 @@ export async function classifyResidueWithEve(
 
 function parseEveOutput(
   rawText: string,
-  seed: ReturnType<typeof getDemoResidueById>
+  seed: ReturnType<typeof getDemoResidueById> | null
 ) {
   const parsedJson = JSON.parse(extractJsonObject(rawText)) as unknown
   const rawOutput = rawEveAnalysisOutputSchema.parse(parsedJson)
+  const fallback = seed ?? getUncertainWasteDecision()
 
   if (rawOutput.status === "needs_input") {
     return eveAnalysisOutputSchema.parse({
@@ -369,36 +396,46 @@ function parseEveOutput(
     })
   }
 
-  const name = cleanText(rawOutput.name, seed.name, 80)
+  const name = cleanText(rawOutput.name, fallback.name, 80)
   const shortName = cleanText(rawOutput.shortName, name, 32)
-  const material = cleanText(rawOutput.material, seed.material, 48)
-  const category = cleanText(rawOutput.category, seed.category, 56)
-  const bin = cleanText(rawOutput.bin, seed.bin, 64)
-  const points = toBoundedInteger(rawOutput.points, seed.points, 0, 30)
-
-  return eveAnalysisOutputSchema.parse({
-    status: "classified",
+  const material = cleanText(rawOutput.material, fallback.material, 48)
+  const category = cleanText(rawOutput.category, fallback.category, 56)
+  const bin = cleanText(rawOutput.bin, fallback.bin, 64)
+  const points = toBoundedInteger(rawOutput.points, fallback.points, 0, 30)
+  const rawDecision = {
     id: cleanKebabId(rawOutput.id, shortName),
+    residueTypeId: cleanOptionalText(rawOutput.residueTypeId, 80),
     name,
     shortName,
     material,
     category,
     bin,
-    confidence: toBoundedInteger(rawOutput.confidence, seed.confidence, 0, 100),
-    preparation: cleanText(rawOutput.preparation, seed.preparation, 180),
-    rationale: cleanText(rawOutput.rationale, seed.rationale, 240),
-    habit: cleanText(rawOutput.habit, seed.habit, 140),
-    impact: cleanText(rawOutput.impact, seed.impact, 140),
+    confidence: toBoundedInteger(
+      rawOutput.confidence,
+      fallback.confidence,
+      0,
+      100
+    ),
+    preparation: cleanText(rawOutput.preparation, fallback.preparation, 180),
+    rationale: cleanText(rawOutput.rationale, fallback.rationale, 240),
+    habit: cleanText(rawOutput.habit, fallback.habit, 140),
+    impact: cleanText(rawOutput.impact, fallback.impact, 140),
     reward: cleanText(rawOutput.reward, `+${points} puntos de habito`, 40),
     points,
     visual: {
       label: cleanVisualLabel(
         rawOutput.visual?.label,
         `${material} ${name} ${category}`,
-        seed.visual.label
+        fallback.visual.label
       ),
       detail: cleanText(rawOutput.visual?.detail, material, 24),
     },
+  }
+  const normalizedDecision = normalizeWasteDecision(rawDecision, seed)
+
+  return eveAnalysisOutputSchema.parse({
+    status: "classified",
+    ...normalizedDecision,
   })
 }
 
@@ -439,7 +476,19 @@ function cleanText(value: unknown, fallback: string, maxLength: number) {
   const text = typeof value === "string" ? value.trim() : ""
   const safeText = text || fallback
 
-  return safeText.length > maxLength ? safeText.slice(0, maxLength).trim() : safeText
+  return safeText.length > maxLength
+    ? safeText.slice(0, maxLength).trim()
+    : safeText
+}
+
+function cleanOptionalText(value: unknown, maxLength: number) {
+  const text = typeof value === "string" ? value.trim() : ""
+
+  if (!text) {
+    return undefined
+  }
+
+  return text.length > maxLength ? text.slice(0, maxLength).trim() : text
 }
 
 function cleanKebabId(value: unknown, fallback: string) {
@@ -536,14 +585,18 @@ function buildClassificationPrompt(
     inputMode === "demo"
       ? `Residuo base de la demo: ${JSON.stringify(seed)}`
       : "No hay residuo base confiable: decide solo por la imagen y devuelve needs_input si no ves un residuo domestico claro."
+  const catalogContext = buildWasteCatalogPromptSummary()
 
   return [
     "Contexto: FAYE es una app peruana para formar habitos de clasificacion y reciclaje domestico.",
     "Problema que resuelve: incertidumbre al botar residuos, poca separacion en casa y falta de retroalimentacion inmediata.",
     "Si la imagen no muestra un residuo domestico visible, si es demasiado ambigua, o si solo muestra una persona, animal, paisaje o comida servida no destinada a desecharse, responde needs_input. No fuerces una clasificacion.",
     "Si ves un envase, empaque, papel, vidrio, metal, plastico u otro material clasificable, responde classified aunque no este aplastado o vacio; usa preparacion condicional cuando haga falta.",
-    "Si hay un residuo claro, responde classified con un id en kebab-case, nombre, categoria, destino, preparacion e impacto. Evita inventar reglas municipales especificas.",
-    "Formato obligatorio para classified: {\"status\":\"classified\",\"id\":\"kebab-case\",\"name\":\"...\",\"shortName\":\"...\",\"material\":\"...\",\"category\":\"...\",\"bin\":\"...\",\"confidence\":0-100,\"preparation\":\"...\",\"rationale\":\"...\",\"habit\":\"...\",\"impact\":\"...\",\"reward\":\"+N puntos de habito\",\"points\":0-30,\"visual\":{\"label\":\"...\",\"detail\":\"...\"}}.",
+    "Usa el catalogo canonico cuando corresponda. Si el residuo no encaja en ningun tipo, responde needs_input o usa baja confianza; no inventes una categoria nueva.",
+    "Catalogo canonico:",
+    catalogContext,
+    "Si hay un residuo claro, responde classified con un id en kebab-case, residueTypeId del catalogo, nombre, categoria, destino, preparacion e impacto. Evita inventar reglas municipales especificas.",
+    "Formato obligatorio para classified: {\"status\":\"classified\",\"id\":\"kebab-case\",\"residueTypeId\":\"pet-bottle\",\"name\":\"...\",\"shortName\":\"...\",\"material\":\"...\",\"category\":\"...\",\"bin\":\"...\",\"confidence\":0-100,\"preparation\":\"...\",\"rationale\":\"...\",\"habit\":\"...\",\"impact\":\"...\",\"reward\":\"+N puntos de habito\",\"points\":0-30,\"visual\":{\"label\":\"...\",\"detail\":\"...\"}}.",
     "Formato obligatorio para needs_input: {\"status\":\"needs_input\",\"title\":\"...\",\"message\":\"...\",\"actionLabel\":\"Agrega una imagen\"}.",
     imageContext,
     hint,

@@ -2,6 +2,12 @@ import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { z } from "zod"
 
+import {
+  wasteDestinations,
+  wasteResidueTypeIds,
+  wasteRuleScopes,
+} from "@/lib/waste-catalog"
+
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
@@ -15,8 +21,12 @@ const habitEventSchema = z.object({
     bin: z.string().trim().min(1).max(96),
     points: z.number().int().min(0).max(30),
     confidence: z.number().int().min(0).max(100),
+    destination: z.enum(wasteDestinations).optional(),
+    normalized: z.boolean().optional(),
     preparation: z.string().trim().min(1).max(220).optional(),
     impact: z.string().trim().min(1).max(180).optional(),
+    residueTypeId: z.enum(wasteResidueTypeIds).optional(),
+    ruleScope: z.enum(wasteRuleScopes).optional(),
     source: z.string().trim().min(1).max(32).optional(),
   }),
 })
@@ -107,6 +117,10 @@ function toHabitEventRow(input: HabitEventInput) {
     metadata: {
       demo: true,
       locale: "es-PE",
+      destination: input.residue.destination ?? null,
+      normalized: input.residue.normalized ?? false,
+      residue_type_id: input.residue.residueTypeId ?? input.residue.id,
+      rule_scope: input.residue.ruleScope ?? null,
     },
   }
 }

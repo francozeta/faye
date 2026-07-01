@@ -79,12 +79,16 @@ type HabitEventPayload = {
     bin: string
     category: string
     confidence: number
+    destination?: string
     id: string
     impact?: string
     material: string
     name: string
+    normalized?: boolean
     points: number
     preparation?: string
+    residueTypeId?: string
+    ruleScope?: string
     source?: string
   }
 }
@@ -526,9 +530,13 @@ export function FayeFlow({
         bin: activeResidue.bin,
         points: activeResidue.points,
         confidence: activeResidue.confidence,
+        destination: activeResidue.destination,
         preparation: activeResidue.preparation,
         impact: activeResidue.impact,
+        normalized: activeResidue.normalized,
         source: activeResidue.source,
+        residueTypeId: activeResidue.residueTypeId,
+        ruleScope: activeResidue.ruleScope,
       },
     }
     let synced = false
