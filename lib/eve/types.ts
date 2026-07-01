@@ -1,9 +1,21 @@
 import type { DemoResidue } from "@/lib/demo-residues"
+import type {
+  WasteDestination,
+  WasteResidueTypeId,
+  WasteRuleScope,
+} from "@/lib/waste-catalog"
 
 export type EveClassificationSource = "ai" | "fallback"
 export type EveInputMode = "image" | "demo" | "empty"
-export type ResidueDecision = Omit<DemoResidue, "id"> & {
+export type ResidueDecision = Omit<
+  DemoResidue,
+  "destination" | "id" | "normalized" | "residueTypeId" | "ruleScope"
+> & {
+  destination: WasteDestination
   id: string
+  normalized: boolean
+  residueTypeId: WasteResidueTypeId
+  ruleScope: WasteRuleScope
 }
 
 export type EveClassificationInput = {
