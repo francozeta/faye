@@ -1,3 +1,4 @@
+import type { Database, TablesInsert } from "@/database.types"
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { z } from "zod"
@@ -32,6 +33,7 @@ const habitEventSchema = z.object({
 })
 
 type HabitEventInput = z.infer<typeof habitEventSchema>
+type HabitEventInsert = TablesInsert<"habit_events">
 
 function createHabitClient(authorization?: string | null) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -41,7 +43,7 @@ function createHabitClient(authorization?: string | null) {
     return null
   }
 
-  return createClient(url, key, {
+  return createClient<Database>(url, key, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -101,7 +103,7 @@ export async function POST(request: Request) {
   })
 }
 
-function toHabitEventRow(input: HabitEventInput) {
+function toHabitEventRow(input: HabitEventInput): HabitEventInsert {
   return {
     device_id: input.deviceId,
     residue_id: input.residue.id,
